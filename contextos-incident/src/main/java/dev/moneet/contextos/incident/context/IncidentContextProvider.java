@@ -95,7 +95,7 @@ public final class IncidentContextProvider implements ContextProvider {
                 DOMAIN + ":" + incident.id() + ":" + key,
                 DOMAIN,
                 evidence.kind().name(),
-                evidence.kind() + " " + evidence.service(),
+                evidence.service() + (evidence.peer() == null ? "" : " -> " + evidence.peer()),
                 content,
                 ranked.score(),
                 ranked.reason(),

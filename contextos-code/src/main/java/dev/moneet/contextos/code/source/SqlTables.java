@@ -8,9 +8,9 @@ import java.util.regex.Pattern;
 /**
  * Lightweight detection of SQL text and the tables it names. This is a hint
  * extractor, not a SQL parser: it reads the identifier after FROM, JOIN, INTO
- * and UPDATE.
+ * and UPDATE. Public so other ContextOS modules read SQL text the same way.
  */
-final class SqlTables {
+public final class SqlTables {
 
     private static final Pattern SQL_START =
             Pattern.compile("(?is)^\\s*(select|insert|update|delete|merge|with)\\b.*");
@@ -24,11 +24,11 @@ final class SqlTables {
     private SqlTables() {
     }
 
-    static boolean looksLikeSql(String text) {
+    public static boolean looksLikeSql(String text) {
         return SQL_START.matcher(text).matches() && !tables(text).isEmpty();
     }
 
-    static Set<String> tables(String sql) {
+    public static Set<String> tables(String sql) {
         Set<String> tables = new LinkedHashSet<>();
         Matcher matcher = TABLE_REFERENCE.matcher(sql);
         while (matcher.find()) {

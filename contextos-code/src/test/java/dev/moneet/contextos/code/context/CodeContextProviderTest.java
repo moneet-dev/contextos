@@ -65,6 +65,15 @@ class CodeContextProviderTest {
     }
 
     @Test
+    void shouldResolveJpqlEntityNamesToTables() {
+        ContextItem findByStatus = new CodeContextProvider(repository, graph)
+                .collect(ContextRequest.of("PaymentRepository#findByStatus", 0)).get(0);
+
+        assertEquals("payments", findByStatus.attributes().get("tables"));
+        assertTrue(findByStatus.reason().endsWith("data access: Payment [JPQL_QUERY]"));
+    }
+
+    @Test
     void shouldPackUnderBudget() {
         ContextPackage pkg = new CodeContextProvider(repository, graph)
                 .provide(new ContextRequest("PaymentService#charge", 2, ContextBudget.tokens(300)));
