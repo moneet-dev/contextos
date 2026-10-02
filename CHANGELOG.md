@@ -21,6 +21,8 @@ and has no dependency on them.
   `getShortestPathEdges`, `JoinPathAnalyzer` and `SchemaFormatter`
 - `contextos`: cross-domain investigation from an incident to code and tables
   under one budget
+- `contextos-mcp`: stdio MCP server with `list_incidents`, `investigate_incident`,
+  `code_context` and `schema_context` tools
 - `examples/`: payment-service codebase, INC-143 runtime snapshot, payments-db schema
 
 ### Architectural Decisions
