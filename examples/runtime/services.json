@@ -1,0 +1,82 @@
+{
+  "services": [
+    {
+      "name": "api-gateway",
+      "kind": "SERVICE",
+      "description": "Public HTTPS entry point"
+    },
+    {
+      "name": "checkout-service",
+      "kind": "SERVICE",
+      "description": "Cart checkout orchestration"
+    },
+    {
+      "name": "refund-batch",
+      "kind": "SERVICE",
+      "description": "Scheduled bulk refund job"
+    },
+    {
+      "name": "payment-service",
+      "kind": "SERVICE",
+      "description": "Charges and refunds",
+      "repository": "payment-service"
+    },
+    {
+      "name": "fraud-api",
+      "kind": "EXTERNAL",
+      "description": "Third-party fraud scoring"
+    },
+    {
+      "name": "payments-db",
+      "kind": "DATABASE",
+      "description": "PostgreSQL, payments schema"
+    },
+    {
+      "name": "payment-events",
+      "kind": "QUEUE",
+      "description": "Kafka topic payment-events"
+    },
+    {
+      "name": "notification-service",
+      "kind": "SERVICE",
+      "description": "Customer emails"
+    }
+  ],
+  "dependencies": [
+    {
+      "from": "api-gateway",
+      "to": "checkout-service",
+      "kind": "CALLS"
+    },
+    {
+      "from": "checkout-service",
+      "to": "payment-service",
+      "kind": "CALLS"
+    },
+    {
+      "from": "refund-batch",
+      "to": "payment-service",
+      "kind": "CALLS"
+    },
+    {
+      "from": "payment-service",
+      "to": "fraud-api",
+      "kind": "CALLS"
+    },
+    {
+      "from": "payment-service",
+      "to": "payments-db",
+      "kind": "QUERIES"
+    },
+    {
+      "from": "payment-service",
+      "to": "payment-events",
+      "kind": "PUBLISHES"
+    },
+    {
+      "from": "notification-service",
+      "to": "payment-events",
+      "kind": "CONSUMES"
+    }
+  ]
+}
