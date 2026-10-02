@@ -17,6 +17,14 @@ java {
     }
 }
 
+// Sources are UTF-8. Without this, javac uses the platform charset (e.g. Windows-1252),
+// which corrupts non-ASCII string literals such as the arrow in GraphEdge.toString().
+allprojects {
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+    }
+}
+
 repositories {
     // Use Maven Central for resolving dependencies.
     mavenCentral()
