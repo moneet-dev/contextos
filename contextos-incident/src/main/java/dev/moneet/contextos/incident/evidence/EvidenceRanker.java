@@ -1,10 +1,10 @@
 package dev.moneet.contextos.incident.evidence;
 
+import dev.moneet.contextos.core.graph.Reached;
 import dev.moneet.contextos.incident.domain.Evidence;
 import dev.moneet.contextos.incident.domain.EvidenceKind;
 import dev.moneet.contextos.incident.domain.Incident;
 import dev.moneet.contextos.incident.domain.ServiceDependency;
-import dev.moneet.contextos.incident.graph.ReachedService;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -43,13 +43,13 @@ public final class EvidenceRanker {
     private static final Duration CHANGE_LIMIT = Duration.ofHours(24);
 
     /** Ranked by score (descending), then onset (earliest first). */
-    public List<RankedEvidence> rank(List<Evidence> evidence, List<ReachedService> scope, Incident incident) {
-        Map<String, ReachedService> reached = new HashMap<>();
-        scope.forEach(r -> reached.put(r.name(), r));
+    public List<RankedEvidence> rank(List<Evidence> evidence, List<Reached<ServiceDependency>> scope, Incident incident) {
+        Map<String, Reached<ServiceDependency>> reached = new HashMap<>();
+        scope.forEach(r -> reached.put(r.id(), r));
 
         List<RankedEvidence> ranked = new ArrayList<>();
         for (Evidence e : evidence) {
-            ReachedService service = closest(e, reached);
+            Reached<ServiceDependency> service = closest(e, reached);
             if (service == null) {
                 continue;
             }
@@ -70,9 +70,10 @@ public final class EvidenceRanker {
         return ranked;
     }
 
-    private static ReachedService closest(Evidence evidence, Map<String, ReachedService> reached) {
-        ReachedService service = reached.get(evidence.service());
-        ReachedService peer = evidence.peer() == null ? null : reached.get(evidence.peer());
+    private static Reached<ServiceDependency> closest(Evidence evidence,
+                                                     Map<String, Reached<ServiceDependency>> reached) {
+        Reached<ServiceDependency> service = reached.get(evidence.service());
+        Reached<ServiceDependency> peer = evidence.peer() == null ? null : reached.get(evidence.peer());
         if (service == null) {
             return peer;
         }
@@ -98,15 +99,15 @@ public final class EvidenceRanker {
     }
 
     /** E.g. "payments-db, queried by payment-service (1 hop)". */
-    private static String relation(ReachedService service) {
+    private static String relation(Reached<ServiceDependency> service) {
         if (service.lastEdge().isEmpty()) {
-            return service.name() + ", affected service";
+            return service.id() + ", affected service";
         }
         ServiceDependency edge = service.lastEdge().get();
-        String phrase = edge.to().equals(service.name())
+        String phrase = edge.to().equals(service.id())
                 ? edge.kind().toPhrase() + " " + edge.from()
                 : edge.kind().fromPhrase() + " " + edge.to();
-        return service.name() + ", " + phrase + " (" + service.distance()
+        return service.id() + ", " + phrase + " (" + service.distance()
                 + (service.distance() == 1 ? " hop)" : " hops)");
     }
 

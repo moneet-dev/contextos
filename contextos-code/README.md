@@ -69,3 +69,19 @@ Score = product of edge weights along the shortest path from the target
 
 The demo uses `examples/payment-service`, a small Spring-style service that the
 Incident and cross-domain phases will reuse.
+
+## ContextOS provider
+
+`CodeContextProvider` adapts `FocusedCodeStrategy` to `contextos-core`. Each
+ranked symbol becomes a `ContextItem`:
+- **content:** the signature, or the source in `FULL` mode
+- **provenance:** `file:line`, plus the path for indirect items
+- **attributes:** `symbol`, `file`, `line` and, for data access, `tables`
+
+```java
+ContextPackage pkg = new CodeContextProvider(repository, graph)
+        .provide(new ContextRequest("PaymentService#charge", 2, ContextBudget.tokens(2000)));
+```
+
+Graph traversal uses the core `TypedGraph`. `CodeGraph.traverse` returns
+`Reached<SymbolReference>` and takes `dev.moneet.contextos.core.graph.Direction`.

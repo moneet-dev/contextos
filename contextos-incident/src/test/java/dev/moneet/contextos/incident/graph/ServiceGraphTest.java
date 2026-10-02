@@ -1,5 +1,6 @@
 package dev.moneet.contextos.incident.graph;
 
+import dev.moneet.contextos.core.graph.Reached;
 import dev.moneet.contextos.incident.domain.DependencyKind;
 import dev.moneet.contextos.incident.domain.Service;
 import dev.moneet.contextos.incident.domain.ServiceDependency;
@@ -55,12 +56,12 @@ class ServiceGraphTest {
 
     @Test
     void shouldTraverseBothDirectionsWithShortestPaths() {
-        List<ReachedService> reached = graph.traverse(List.of("payments"), 2, Direction.BOTH);
+        List<Reached<ServiceDependency>> reached = graph.traverse(List.of("payments"), 2, Direction.BOTH);
 
         assertEquals(Map.of("payments", 0, "db", 1, "events", 1, "checkout", 1, "batch", 1,
                 "notifier", 2, "gateway", 2), distances(reached));
 
-        ReachedService notifier = reached.stream().filter(r -> r.name().equals("notifier")).findFirst().orElseThrow();
+        Reached<ServiceDependency> notifier = reached.stream().filter(r -> r.id().equals("notifier")).findFirst().orElseThrow();
         assertEquals(List.of("payments", "events", "notifier"), notifier.nodes());
         assertEquals(DependencyKind.CONSUMES, notifier.lastEdge().orElseThrow().kind());
     }
@@ -70,8 +71,8 @@ class ServiceGraphTest {
         assertTrue(graph.traverse(List.of("ghost"), 2, Direction.BOTH).isEmpty());
     }
 
-    private static Map<String, Integer> distances(List<ReachedService> reached) {
-        return reached.stream().collect(Collectors.toMap(ReachedService::name, ReachedService::distance));
+    private static Map<String, Integer> distances(List<Reached<ServiceDependency>> reached) {
+        return reached.stream().collect(Collectors.toMap(Reached::id, Reached::distance));
     }
 
     private static Service service(String name) {

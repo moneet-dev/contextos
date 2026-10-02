@@ -82,3 +82,22 @@ contains unrelated noise (a fraud-api warning and later SMTP failures).
 ./gradlew :contextos-incident:demo --args="examples/runtime INC-143 1"
 ./gradlew :contextos-incident:test
 ```
+
+## ContextOS provider
+
+`IncidentContextProvider` adapts `FocusedIncidentStrategy` to `contextos-core`.
+- The first item is an overview: the incident header and the services in scope, with score 1.0.
+- It is followed by one item per ranked piece of evidence:
+  - **content:** onset and summary
+  - **reason:** relation and timing
+  - **provenance:** the telemetry records it came from
+  - **attributes:** the collector's details plus `service`, `peer` and the score breakdown
+
+```java
+ContextPackage pkg = new IncidentContextProvider(snapshot, graph)
+        .provide(new ContextRequest("INC-143", 2, ContextBudget.tokens(1500)));
+```
+
+Graph traversal uses the core `TypedGraph`. `ServiceGraph.traverse` returns
+`Reached<ServiceDependency>`; `Direction.DEPENDENCIES` / `DEPENDENTS` map to
+core `OUTGOING` / `INCOMING`.

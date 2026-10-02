@@ -1,0 +1,25 @@
+plugins {
+    id 'java-library'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+// Adapter only: depends on the SQL Schema Context library (the root project),
+// which itself has no dependency on ContextOS.
+dependencies {
+    api project(':contextos-core')
+    api project(':')
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

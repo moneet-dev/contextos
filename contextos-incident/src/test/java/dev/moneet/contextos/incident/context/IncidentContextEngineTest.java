@@ -1,11 +1,11 @@
 package dev.moneet.contextos.incident.context;
 
+import dev.moneet.contextos.core.graph.Reached;
 import dev.moneet.contextos.incident.domain.Evidence;
 import dev.moneet.contextos.incident.domain.EvidenceKind;
 import dev.moneet.contextos.incident.domain.RuntimeSnapshot;
 import dev.moneet.contextos.incident.evidence.RankedEvidence;
 import dev.moneet.contextos.incident.graph.Direction;
-import dev.moneet.contextos.incident.graph.ReachedService;
 import dev.moneet.contextos.incident.graph.ServiceGraph;
 import dev.moneet.contextos.incident.graph.ServiceGraphBuilder;
 import dev.moneet.contextos.incident.source.FileRuntimeSource;
@@ -35,7 +35,7 @@ class IncidentContextEngineTest {
 
         assertEquals(List.of("payment-service", "fraud-api", "payments-db", "payment-events",
                         "checkout-service", "refund-batch"),
-                context.scope().stream().map(ReachedService::name).toList());
+                context.scope().stream().map(Reached::id).toList());
     }
 
     @Test

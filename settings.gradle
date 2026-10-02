@@ -11,5 +11,7 @@ plugins {
 }
 
 rootProject.name = 'schema-context'
+include('contextos-core')
 include('contextos-code')
 include('contextos-incident')
+include('contextos-sql')

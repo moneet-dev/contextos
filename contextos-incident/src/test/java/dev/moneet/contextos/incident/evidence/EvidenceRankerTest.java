@@ -6,7 +6,7 @@ import dev.moneet.contextos.incident.domain.EvidenceKind;
 import dev.moneet.contextos.incident.domain.Incident;
 import dev.moneet.contextos.incident.domain.ServiceDependency;
 import dev.moneet.contextos.incident.domain.Severity;
-import dev.moneet.contextos.incident.graph.ReachedService;
+import dev.moneet.contextos.core.graph.Reached;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -22,10 +22,10 @@ class EvidenceRankerTest {
     private static final Incident INCIDENT =
             new Incident("INC-1", "t", Severity.SEV2, START, null, List.of("api"), List.of());
 
-    private static final List<ReachedService> SCOPE = List.of(
-            new ReachedService("api", 0, List.of()),
-            new ReachedService("db", 1, List.of(new ServiceDependency("api", "db", DependencyKind.QUERIES))),
-            new ReachedService("job", 1, List.of(new ServiceDependency("job", "api", DependencyKind.CALLS))));
+    private static final List<Reached<ServiceDependency>> SCOPE = List.of(
+            new Reached<>("api", 0, List.<ServiceDependency>of()),
+            new Reached<>("db", 1, List.of(new ServiceDependency("api", "db", DependencyKind.QUERIES))),
+            new Reached<>("job", 1, List.of(new ServiceDependency("job", "api", DependencyKind.CALLS))));
 
     @Test
     void shouldScoreAsProductOfFactors() {

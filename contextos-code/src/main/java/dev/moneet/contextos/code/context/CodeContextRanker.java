@@ -3,7 +3,7 @@ package dev.moneet.contextos.code.context;
 import dev.moneet.contextos.code.domain.CodeRepository;
 import dev.moneet.contextos.code.domain.ReferenceKind;
 import dev.moneet.contextos.code.domain.SymbolReference;
-import dev.moneet.contextos.code.graph.ReachedSymbol;
+import dev.moneet.contextos.core.graph.Reached;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -39,22 +39,22 @@ public final class CodeContextRanker {
     }
 
     /** Items ordered by score (descending), then distance, then id. */
-    public List<CodeContextItem> rank(List<ReachedSymbol> reached, CodeRepository repository) {
+    public List<CodeContextItem> rank(List<Reached<SymbolReference>> reached, CodeRepository repository) {
         List<CodeContextItem> items = new ArrayList<>();
 
-        for (ReachedSymbol r : reached) {
+        for (Reached<SymbolReference> r : reached) {
             double score = 1.0;
             for (SymbolReference edge : r.path()) {
                 score *= weights.getOrDefault(edge.kind(), 0.5);
             }
 
             items.add(new CodeContextItem(
-                    repository.getSymbol(r.symbolId()),
+                    repository.getSymbol(r.id()),
                     score,
                     r.distance(),
                     reason(r, repository),
                     r.path(),
-                    repository.getDataAccess(r.symbolId())));
+                    repository.getDataAccess(r.id())));
         }
 
         items.sort(Comparator.comparingDouble(CodeContextItem::score).reversed()
@@ -64,13 +64,13 @@ public final class CodeContextRanker {
     }
 
     /** E.g. "called by PaymentController#pay(PaymentRequest)". */
-    private static String reason(ReachedSymbol reached, CodeRepository repository) {
+    private static String reason(Reached<SymbolReference> reached, CodeRepository repository) {
         if (reached.lastEdge().isEmpty()) {
             return "target";
         }
         SymbolReference edge = reached.lastEdge().get();
 
-        if (edge.targetId().equals(reached.symbolId())) {
+        if (edge.targetId().equals(reached.id())) {
             return edge.kind().targetPhrase() + " "
                     + repository.getSymbol(edge.sourceId()).displayName();
         }

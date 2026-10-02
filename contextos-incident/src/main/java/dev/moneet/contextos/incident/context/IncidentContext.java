@@ -1,8 +1,9 @@
 package dev.moneet.contextos.incident.context;
 
+import dev.moneet.contextos.core.graph.Reached;
 import dev.moneet.contextos.incident.domain.Incident;
+import dev.moneet.contextos.incident.domain.ServiceDependency;
 import dev.moneet.contextos.incident.evidence.RankedEvidence;
-import dev.moneet.contextos.incident.graph.ReachedService;
 
 import java.util.List;
 
@@ -12,7 +13,7 @@ import java.util.List;
  * evidence and the rendered, LLM-ready text.
  */
 public record IncidentContext(Incident incident,
-                              List<ReachedService> scope,
+                              List<Reached<ServiceDependency>> scope,
                               List<RankedEvidence> evidence,
                               String rendered) {
 

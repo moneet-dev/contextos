@@ -2,7 +2,7 @@ package dev.moneet.contextos.code.context;
 
 import dev.moneet.contextos.code.domain.Symbol;
 import dev.moneet.contextos.code.domain.SymbolReference;
-import dev.moneet.contextos.code.graph.ReachedSymbol;
+import dev.moneet.contextos.core.graph.Reached;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -63,19 +63,24 @@ public final class CodeRenderer {
                             .append("\n");
                 }
 
-                String text = mode == RenderMode.FULL && !symbol.kind().isType()
-                        ? dedent(symbol.source())
-                        : symbol.signature();
-                sb.append(text).append("\n\n");
+                sb.append(text(item, mode)).append("\n\n");
             }
         }
 
         return sb.toString();
     }
 
+    /** The item's code: member source in FULL mode, otherwise the signature (types are always headers). */
+    public String text(CodeContextItem item, RenderMode mode) {
+        Symbol symbol = item.symbol();
+        return mode == RenderMode.FULL && !symbol.kind().isType()
+                ? dedent(symbol.source())
+                : symbol.signature();
+    }
+
     /** E.g. {@code A -CALLS-> B <-IMPLEMENTS- C}. */
-    private static String path(CodeContextItem item, Function<String, String> name) {
-        List<String> nodes = new ReachedSymbol(item.symbol().id(), item.distance(), item.path()).nodes();
+    static String path(CodeContextItem item, Function<String, String> name) {
+        List<String> nodes = new Reached<>(item.symbol().id(), item.distance(), item.path()).nodes();
         StringBuilder sb = new StringBuilder(name.apply(nodes.get(0)));
 
         for (int i = 0; i < item.path().size(); i++) {
