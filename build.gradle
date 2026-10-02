@@ -40,5 +40,12 @@ tasks.named('test') {
 }
 
 application {
-    mainClass = 'dev.moneet.schema.Main'
+    mainClass = 'dev.moneet.schema.EcommerceDemo'
+}
+
+tasks.register('complianceDemo', JavaExec) {
+    group = 'application'
+    description = 'Runs the financial compliance schema demo.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'dev.moneet.schema.FinancialComplianceDemo'
 }
