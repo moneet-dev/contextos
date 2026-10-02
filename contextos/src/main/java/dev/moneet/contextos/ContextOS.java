@@ -179,7 +179,7 @@ public final class ContextOS {
             tables.addAll(tablesIn(attributes.get("message")));
             for (String table : tables) {
                 if (databases.get(database).schema().containsTable(table)) {
-                    links.add(new Link(evidence.id(), evidence.title(), SqlContextProvider.DOMAIN, database,
+                    links.add(new Link(evidence.id(), label(evidence), SqlContextProvider.DOMAIN, database,
                             table, table, "query on " + database, evidence.score()));
                 }
             }
@@ -207,8 +207,13 @@ public final class ContextOS {
     }
 
     private static Link codeLink(ContextItem from, String repositoryName, Symbol symbol, String via) {
-        return new Link(from.id(), from.title(), CodeContextProvider.DOMAIN, repositoryName,
+        return new Link(from.id(), label(from), CodeContextProvider.DOMAIN, repositoryName,
                 symbol.id(), symbol.displayName(), via, from.score());
+    }
+
+    /** Incident evidence is labelled with its kind, e.g. "SLOW_SPANS payment-service -> payments-db". */
+    private static String label(ContextItem item) {
+        return item.domain().equals(IncidentContextProvider.DOMAIN) ? item.kind() + " " + item.title() : item.title();
     }
 
     /** One link per target, the one with the highest weight. */
