@@ -70,7 +70,7 @@ class ContextOSTest {
         assertTrue(findByPaymentId.attributes().get("linkedFrom").startsWith("incident:INC-143:"));
 
         ContextItem table = items.get("sql:payment_transactions");
-        assertTrue(table.reason().contains("linked from payment-service -> payments-db (query on payments-db)"),
+        assertTrue(table.reason().contains("linked from SLOW_SPANS payment-service -> payments-db (query on payments-db)"),
                 table.reason());
         assertTrue(items.containsKey("sql:customers"), "tables around linked tables are included");
     }

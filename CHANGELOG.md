@@ -4,6 +4,35 @@ All notable changes to this project are documented here.
 
 ---
 
+## ContextOS – Code, Incident and Cross-Domain Context
+
+ContextOS modules added around the Schema Context Engine, which is unchanged
+and has no dependency on them.
+
+### Added
+
+- `contextos-code`: Java repository parsing (JavaParser), typed symbol graph,
+  ranked code context with provenance, data-access hints, Spring endpoint lookup
+- `contextos-incident`: service topology and file-based telemetry (logs,
+  metrics, traces, changes), evidence collection and explainable ranking
+- `contextos-core`: typed graph with BFS, `ContextItem` / `ContextPackage`,
+  token budget and greedy packing
+- `contextos-sql`: provider built on `SchemaGraph`, `BfsTraversalStrategy`,
+  `getShortestPathEdges`, `JoinPathAnalyzer` and `SchemaFormatter`
+- `contextos`: cross-domain investigation from an incident to code and tables
+  under one budget
+- `examples/`: payment-service codebase, INC-143 runtime snapshot, payments-db schema
+
+### Architectural Decisions
+
+- Each domain is usable on its own; shared pieces were extracted only after
+  Code and Incident Context both needed them
+- The SQL adapter reuses the engine's traversal, path and join analysis rather
+  than reimplementing them
+- No LLM in the loop: graphs, named ranking factors and an explicit budget
+
+---
+
 ## v0.4 – Minimal Multi-Vendor Metadata Support
 
 ### Added
