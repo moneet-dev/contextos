@@ -1,0 +1,35 @@
+plugins {
+    id 'java-library'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+// The platform layer: links the domain providers into one investigation.
+dependencies {
+    api project(':contextos-core')
+    api project(':contextos-sql')
+    api project(':contextos-code')
+    api project(':contextos-incident')
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    systemProperty 'contextos.examples', rootProject.file('examples').absolutePath
+}
+
+tasks.register('demo', JavaExec) {
+    group = 'application'
+    description = 'Investigates INC-143 across incident, code and database context.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'dev.moneet.contextos.ContextOsDemo'
+    workingDir = rootProject.projectDir
+}
