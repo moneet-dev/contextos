@@ -77,6 +77,10 @@ their join quality.
 ./gradlew :contextos:demo --args="INC-143 2500"
 ```
 
+Or give it to an agent: [`contextos-mcp`](contextos-mcp/README.md) serves the
+same investigation as MCP tools, so Claude Code can call `investigate_incident`
+itself and drill down with `code_context` and `schema_context`.
+
 ## Architecture
 
 ```
@@ -103,6 +107,7 @@ their join quality.
 | `contextos-code` | Java repository parsing, symbol graph, ranked code context | [README](contextos-code/README.md) |
 | `contextos-incident` | Topology and telemetry, evidence collection and ranking | [README](contextos-incident/README.md) |
 | `contextos` | Cross-domain investigation | [README](contextos/README.md) |
+| `contextos-mcp` | MCP server exposing the investigation and drill-down tools | [README](contextos-mcp/README.md) |
 
 ### Design principles
 
