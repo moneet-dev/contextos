@@ -2,9 +2,10 @@ package dev.moneet.contextos.code.context;
 
 import dev.moneet.contextos.code.domain.CodeRepository;
 import dev.moneet.contextos.code.domain.Symbol;
+import dev.moneet.contextos.code.domain.SymbolReference;
 import dev.moneet.contextos.code.graph.CodeGraph;
-import dev.moneet.contextos.code.graph.Direction;
-import dev.moneet.contextos.code.graph.ReachedSymbol;
+import dev.moneet.contextos.core.graph.Direction;
+import dev.moneet.contextos.core.graph.Reached;
 
 import java.util.List;
 
@@ -47,7 +48,7 @@ public final class FocusedCodeStrategy implements CodeContextStrategy {
             throw new IllegalArgumentException("No symbol matches: " + query);
         }
 
-        List<ReachedSymbol> reached = graph.traverse(targets, depth, direction);
+        List<Reached<SymbolReference>> reached = graph.traverse(targets, depth, direction);
 
         List<CodeContextItem> items = ranker.rank(reached, repository).stream()
                 .limit(maxItems)

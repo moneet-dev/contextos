@@ -1,11 +1,11 @@
 package dev.moneet.contextos.incident.context;
 
+import dev.moneet.contextos.core.graph.Reached;
 import dev.moneet.contextos.incident.domain.Evidence;
 import dev.moneet.contextos.incident.domain.Incident;
 import dev.moneet.contextos.incident.domain.Service;
 import dev.moneet.contextos.incident.domain.ServiceDependency;
 import dev.moneet.contextos.incident.evidence.RankedEvidence;
-import dev.moneet.contextos.incident.graph.ReachedService;
 import dev.moneet.contextos.incident.graph.ServiceGraph;
 
 import java.time.Instant;
@@ -28,10 +28,38 @@ public final class IncidentRenderer {
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneOffset.UTC);
 
     public String render(Incident incident,
-                         List<ReachedService> scope,
+                         List<Reached<ServiceDependency>> scope,
                          List<RankedEvidence> evidence,
                          ServiceGraph graph) {
 
+        StringBuilder sb = new StringBuilder();
+        String day = DATE.format(incident.startedAt());
+
+        sb.append(header(incident));
+        sb.append("\n").append(scope(scope, graph));
+
+        sb.append("\nTIMELINE (UTC)\n");
+        evidence.stream()
+                .sorted(Comparator.comparing((RankedEvidence r) -> r.evidence().onset()))
+                .forEach(r -> sb.append(String.format("  %-16s %-20s %-15s %s\n",
+                        time(r.evidence().onset(), day), r.evidence().service(),
+                        r.evidence().kind(), r.evidence().summary())));
+
+        sb.append("\nEVIDENCE (ranked)\n");
+        for (int i = 0; i < evidence.size(); i++) {
+            RankedEvidence r = evidence.get(i);
+            Evidence e = r.evidence();
+            sb.append(String.format("%2d. [%.2f] %s %s: %s\n", i + 1, r.score(), e.kind(), e.service(), e.summary()));
+            sb.append("    why: ").append(r.reason()).append("\n");
+            sb.append("    score: ").append(r.breakdown()).append("\n");
+            sb.append("    source: ").append(sources(e)).append("\n");
+        }
+
+        return sb.toString();
+    }
+
+    /** Id, severity, title, start and detection times, affected services and symptoms. */
+    public String header(Incident incident) {
         StringBuilder sb = new StringBuilder();
         String day = DATE.format(incident.startedAt());
 
@@ -47,45 +75,31 @@ public final class IncidentRenderer {
             sb.append("Symptoms:\n");
             incident.symptoms().forEach(s -> sb.append("  - ").append(s).append("\n"));
         }
-
-        sb.append("\nSERVICES IN SCOPE\n");
-        for (ReachedService reached : scope) {
-            Service service = graph.getService(reached.name());
-            sb.append(String.format("  %-22s %-9s %s%n", service.name(), service.kind(), relation(reached)));
-        }
-
-        sb.append("\nTIMELINE (UTC)\n");
-        evidence.stream()
-                .sorted(Comparator.comparing((RankedEvidence r) -> r.evidence().onset()))
-                .forEach(r -> sb.append(String.format("  %-16s %-20s %-15s %s%n",
-                        time(r.evidence().onset(), day), r.evidence().service(),
-                        r.evidence().kind(), r.evidence().summary())));
-
-        sb.append("\nEVIDENCE (ranked)\n");
-        for (int i = 0; i < evidence.size(); i++) {
-            RankedEvidence r = evidence.get(i);
-            Evidence e = r.evidence();
-            sb.append(String.format("%2d. [%.2f] %s %s: %s%n", i + 1, r.score(), e.kind(), e.service(), e.summary()));
-            sb.append("    why: ").append(r.reason()).append("\n");
-            sb.append("    score: ").append(r.breakdown()).append("\n");
-            sb.append("    source: ").append(sources(e)).append("\n");
-        }
-
         return sb.toString();
     }
 
-    private static String relation(ReachedService reached) {
+    /** One line per service in scope: name, kind and how it relates to the affected services. */
+    public String scope(List<Reached<ServiceDependency>> scope, ServiceGraph graph) {
+        StringBuilder sb = new StringBuilder("SERVICES IN SCOPE\n");
+        for (Reached<ServiceDependency> reached : scope) {
+            Service service = graph.getService(reached.id());
+            sb.append(String.format("  %-22s %-9s %s\n", service.name(), service.kind(), relation(reached)));
+        }
+        return sb.toString();
+    }
+
+    private static String relation(Reached<ServiceDependency> reached) {
         if (reached.lastEdge().isEmpty()) {
             return "affected";
         }
         ServiceDependency edge = reached.lastEdge().get();
-        String phrase = edge.to().equals(reached.name())
+        String phrase = edge.to().equals(reached.id())
                 ? edge.kind().toPhrase() + " " + edge.from()
                 : edge.kind().fromPhrase() + " " + edge.to();
         return phrase + (reached.distance() > 1 ? "  (path: " + String.join(" > ", reached.nodes()) + ")" : "");
     }
 
-    private static String sources(Evidence evidence) {
+    static String sources(Evidence evidence) {
         String shown = String.join(", ", evidence.sources().stream().map(Object::toString).toList());
         int more = evidence.occurrences() - evidence.sources().size();
         return more > 0 ? shown + " (+" + more + " more)" : shown;

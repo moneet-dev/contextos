@@ -1,8 +1,10 @@
 package dev.moneet.contextos.incident.context;
 
+import dev.moneet.contextos.core.graph.Reached;
 import dev.moneet.contextos.incident.domain.Evidence;
 import dev.moneet.contextos.incident.domain.Incident;
 import dev.moneet.contextos.incident.domain.RuntimeSnapshot;
+import dev.moneet.contextos.incident.domain.ServiceDependency;
 import dev.moneet.contextos.incident.evidence.AnalysisWindow;
 import dev.moneet.contextos.incident.evidence.ChangeEvidenceCollector;
 import dev.moneet.contextos.incident.evidence.EvidenceCollector;
@@ -12,7 +14,6 @@ import dev.moneet.contextos.incident.evidence.MetricEvidenceCollector;
 import dev.moneet.contextos.incident.evidence.RankedEvidence;
 import dev.moneet.contextos.incident.evidence.TraceEvidenceCollector;
 import dev.moneet.contextos.incident.graph.Direction;
-import dev.moneet.contextos.incident.graph.ReachedService;
 import dev.moneet.contextos.incident.graph.ServiceGraph;
 
 import java.util.ArrayList;
@@ -62,8 +63,8 @@ public final class FocusedIncidentStrategy implements IncidentContextStrategy {
                     + " is in the topology: " + incident.affectedServices());
         }
 
-        List<ReachedService> scope = graph.traverse(affected, depth, direction);
-        Set<String> services = scope.stream().map(ReachedService::name).collect(Collectors.toSet());
+        List<Reached<ServiceDependency>> scope = graph.traverse(affected, depth, direction);
+        Set<String> services = scope.stream().map(Reached::id).collect(Collectors.toSet());
         AnalysisWindow window = AnalysisWindow.around(incident);
 
         List<Evidence> evidence = new ArrayList<>();

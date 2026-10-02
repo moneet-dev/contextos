@@ -1,9 +1,11 @@
 package dev.moneet.contextos.incident.domain;
 
+import dev.moneet.contextos.core.graph.Edge;
+
 import java.util.Objects;
 
 /** {@code from} depends on {@code to}. */
-public record ServiceDependency(String from, String to, DependencyKind kind) {
+public record ServiceDependency(String from, String to, DependencyKind kind) implements Edge {
 
     public ServiceDependency {
         Objects.requireNonNull(from, "from must not be null");
@@ -11,8 +13,13 @@ public record ServiceDependency(String from, String to, DependencyKind kind) {
         Objects.requireNonNull(kind, "kind must not be null");
     }
 
-    /** The endpoint opposite {@code service}. */
-    public String other(String service) {
-        return from.equals(service) ? to : from;
+    @Override
+    public String source() {
+        return from;
+    }
+
+    @Override
+    public String target() {
+        return to;
     }
 }

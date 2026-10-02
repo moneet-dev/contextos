@@ -9,8 +9,8 @@ import dev.moneet.contextos.code.domain.CodeRepository;
 import dev.moneet.contextos.code.domain.DataAccess;
 import dev.moneet.contextos.code.graph.CodeGraph;
 import dev.moneet.contextos.code.graph.CodeGraphBuilder;
-import dev.moneet.contextos.code.graph.Direction;
 import dev.moneet.contextos.code.source.JavaRepositorySource;
+import dev.moneet.contextos.core.graph.Direction;
 
 import java.nio.file.Path;
 

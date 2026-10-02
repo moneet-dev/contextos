@@ -6,6 +6,8 @@ import dev.moneet.contextos.code.domain.SourceLocation;
 import dev.moneet.contextos.code.domain.Symbol;
 import dev.moneet.contextos.code.domain.SymbolKind;
 import dev.moneet.contextos.code.domain.SymbolReference;
+import dev.moneet.contextos.core.graph.Direction;
+import dev.moneet.contextos.core.graph.Reached;
 import org.junit.jupiter.api.Test;
 
 import java.util.EnumSet;
@@ -78,8 +80,8 @@ class CodeGraphTest {
 
     @Test
     void shouldRecordPathFromStart() {
-        ReachedSymbol e = graph.traverse(List.of("d"), 3, Direction.INCOMING).stream()
-                .filter(r -> r.symbolId().equals("e"))
+        Reached<SymbolReference> e = graph.traverse(List.of("d"), 3, Direction.INCOMING).stream()
+                .filter(r -> r.id().equals("e"))
                 .findFirst()
                 .orElseThrow();
 
@@ -93,8 +95,8 @@ class CodeGraphTest {
         assertTrue(graph.traverse(List.of("missing"), 2, Direction.BOTH).isEmpty());
     }
 
-    private static Map<String, Integer> distances(List<ReachedSymbol> reached) {
-        return reached.stream().collect(Collectors.toMap(ReachedSymbol::symbolId, ReachedSymbol::distance));
+    private static Map<String, Integer> distances(List<Reached<SymbolReference>> reached) {
+        return reached.stream().collect(Collectors.toMap(Reached::id, Reached::distance));
     }
 
     private static Symbol symbol(String id) {
