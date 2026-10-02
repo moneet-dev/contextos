@@ -12,3 +12,4 @@ plugins {
 
 rootProject.name = 'schema-context'
 include('contextos-code')
+include('contextos-incident')

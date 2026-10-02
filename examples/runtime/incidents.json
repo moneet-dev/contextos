@@ -1,0 +1,18 @@
+{
+  "incidents": [
+    {
+      "id": "INC-143",
+      "title": "payment-service 5xx elevated",
+      "severity": "SEV2",
+      "startedAt": "2026-09-30T14:02:00.000Z",
+      "detectedAt": "2026-09-30T14:06:00.000Z",
+      "affectedServices": [
+        "payment-service"
+      ],
+      "symptoms": [
+        "HTTP 5xx on payment-service up 320%",
+        "Checkout failures reported by customers"
+      ]
+    }
+  ]
+}
