@@ -1,0 +1,33 @@
+plugins {
+    id 'java-library'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'com.github.javaparser:javaparser-symbol-solver-core:3.26.4'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    systemProperty 'contextos.examples', rootProject.file('examples').absolutePath
+}
+
+// A JavaExec task rather than the 'application' plugin, so the root project's
+// `./gradlew run` keeps running only the SQL Schema Context demo.
+tasks.register('demo', JavaExec) {
+    group = 'application'
+    description = 'Runs the Code Context demo against examples/payment-service.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'dev.moneet.contextos.code.CodeContextDemo'
+    workingDir = rootProject.projectDir
+}
