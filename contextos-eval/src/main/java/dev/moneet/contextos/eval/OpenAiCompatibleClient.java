@@ -12,8 +12,10 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -24,7 +26,8 @@ import java.util.regex.Pattern;
  * <p>Rate limits (429) and transient server errors (5xx) are retried with
  * backoff, honouring the server's requested delay; free tiers hit rate limits
  * routinely. Authentication errors, other client errors and a quota of zero fail
- * immediately, as does an answer cut off by {@code max_tokens}.
+ * immediately, as does an answer cut off by {@code max_tokens}. A rate limit that
+ * outlasts every retry is treated as an exhausted quota and stops the run.
  */
 public final class OpenAiCompatibleClient implements ChatModel {
 
@@ -62,6 +65,7 @@ public final class OpenAiCompatibleClient implements ChatModel {
     private static final int MAX_ATTEMPTS = 6;
     private static final Duration MAX_BACKOFF = Duration.ofSeconds(60);
     private static final Pattern ZERO_QUOTA = Pattern.compile("limit: 0\\b");
+    private static final Pattern QUOTA_METRIC = Pattern.compile("Quota exceeded for metric: ([^\\\\\"]+)");
     private static final Pattern RETRY_DELAY = Pattern.compile(
             "\"retryDelay\"\\s*:\\s*\"(\\d+(?:\\.\\d+)?)s\"|retry in (\\d+(?:\\.\\d+)?)s");
 
@@ -109,11 +113,17 @@ public final class OpenAiCompatibleClient implements ChatModel {
             if (status == 429 && ZERO_QUOTA.matcher(response.body()).find()) {
                 // e.g. Gemini's free tier has no quota at all for some models
                 throw new ApiException(status, "The quota for model " + model + " is 0 on this key: "
-                        + excerpt(response.body()), true);
+                        + describe(response.body()), true);
+            }
+            if (status == 429 && attempt == MAX_ATTEMPTS) {
+                // Waited out every backoff (over a minute) and still limited: a daily or account
+                // quota, which every later call would hit too
+                throw new ApiException(status, "Still rate-limited after " + MAX_ATTEMPTS + " attempts; "
+                        + "likely a daily quota for " + model + ": " + describe(response.body()), true);
             }
             boolean retryable = status == 429 || status >= 500;
             if (!retryable || attempt == MAX_ATTEMPTS) {
-                throw new ApiException(status, "HTTP " + status + " from " + baseUrl + ": " + excerpt(response.body()));
+                throw new ApiException(status, "HTTP " + status + " from " + baseUrl + ": " + describe(response.body()));
             }
             pause(backoff(response, attempt));
         }
@@ -203,6 +213,17 @@ public final class OpenAiCompatibleClient implements ChatModel {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Interrupted", e);
         }
+    }
+
+    /** The start of the body, plus any quota it names, which providers often put past the start. */
+    private static String describe(String body) {
+        Set<String> quotas = new LinkedHashSet<>();
+        Matcher matcher = QUOTA_METRIC.matcher(body == null ? "" : body);
+        while (matcher.find()) {
+            quotas.add(matcher.group(1).trim());
+        }
+        String text = excerpt(body);
+        return quotas.isEmpty() ? text : text + " [quota: " + String.join("; ", quotas) + "]";
     }
 
     private static String excerpt(String body) {

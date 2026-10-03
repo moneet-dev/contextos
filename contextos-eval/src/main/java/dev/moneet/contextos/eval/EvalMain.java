@@ -33,8 +33,9 @@ import java.util.Map;
  * --max-tokens   output token limit per call, including any reasoning (default 4096)
  * --examples     workspace directory (default examples)
  * --cases        rubric file (default examples/eval/cases.json)
- * --out          output directory (default build/eval/&lt;timestamp&gt;)
+ * --out          output directory (default build/eval/&lt;timestamp&gt;); results are saved after every trial
  * --dry-run      write every prompt to --out without calling any API
+ * --resume       continue the run saved in --out: completed trials are kept, failed ones retried
  * </pre>
  * The API key is read from the environment and never printed or written.
  */
@@ -50,8 +51,7 @@ public final class EvalMain {
             System.err.println("Error: " + e.getMessage());
             System.exit(2);
         } catch (OpenAiCompatibleClient.ApiException e) {
-            System.err.println("Stopped: " + e.getMessage());
-            System.err.println("Check the API key, the model name and the provider's base URL.");
+            // run() has already reported what was saved and how to continue
             System.exit(1);
         }
     }
@@ -61,8 +61,8 @@ public final class EvalMain {
         Path examples = Path.of(options.getOrDefault("examples", "examples"));
         Path out = Path.of(options.getOrDefault("out", "build/eval/" + stamp));
         int budget = integer(options, "budget", 4000);
-        int runs = integer(options, "runs", 3);
         boolean dryRun = options.containsKey("dry-run");
+        boolean resume = options.containsKey("resume");
 
         List<EvalCase> cases = EvalCase.load(Path.of(options.getOrDefault("cases", "examples/eval/cases.json")));
         if (options.containsKey("incidents")) {
@@ -102,15 +102,61 @@ public final class EvalMain {
         ChatModel subject = new OpenAiCompatibleClient(baseUrl, model, apiKey, temperature, maxTokens);
         Judge judge = new Judge(new OpenAiCompatibleClient(baseUrl, judgeModel, apiKey, 0.0, maxTokens));
 
-        System.out.printf("Evaluating %s via %s: %d incident(s) x %d condition(s) x %d run(s), budget %d tokens%n",
-                model, provider.name().toLowerCase(), cases.size(), conditions.size(), runs, budget);
-        List<Trial> trials = new EvalRunner(contexts, subject, judge, System.out)
-                .run(cases, new EvalRunner.Settings(budget, runs, conditions));
+        Report.Saved saved = previous(out, resume, provider.name().toLowerCase(), model, judgeModel, budget);
+        int runs = integer(options, "runs", saved == null ? 3 : saved.setup().runs());
+        Report.Setup setup = new Report.Setup(provider.name().toLowerCase(), model, judgeModel, budget,
+                saved == null ? runs : Math.max(runs, saved.setup().runs()),
+                saved == null ? stamp : saved.setup().startedAt());
+        List<Trial> previous = saved == null ? List.of() : saved.trials();
 
-        Report.write(out, new Report.Setup(provider.name().toLowerCase(), model, judgeModel, budget, runs, stamp),
-                trials);
+        System.out.printf("Evaluating %s via %s: %d incident(s) x %d condition(s) x %d run(s), budget %d tokens%s%n",
+                model, provider.name().toLowerCase(), cases.size(), conditions.size(), runs, budget,
+                resume ? ", resuming " + previous.stream().filter(t -> t.error() == null).count() + " saved trial(s)"
+                        : "");
+        try {
+            new EvalRunner(contexts, subject, judge, System.out).run(cases,
+                    new EvalRunner.Settings(budget, runs, conditions), previous,
+                    trials -> Report.write(out, setup, trials));
+        } catch (OpenAiCompatibleClient.ApiException e) {
+            System.err.println("\nStopped: " + e.getMessage());
+            System.err.println("Completed trials are saved in " + out.toAbsolutePath() + ".");
+            System.err.println("If this is a quota, continue once it resets with the same options plus:");
+            System.err.println("  --resume --out " + out);
+            System.err.println("Otherwise check the API key, the model name and the provider's base URL.");
+            throw e;
+        }
+
         System.out.println("\nReport: " + out.resolve("report.md").toAbsolutePath());
         System.out.println("Trials: " + out.resolve("results.json").toAbsolutePath());
+    }
+
+    /**
+     * The saved results to continue, or null for a new run. A new run refuses to
+     * overwrite existing results; a resumed run must use the same provider, models
+     * and budget, so every trial in the report is comparable.
+     */
+    static Report.Saved previous(Path out, boolean resume, String provider, String model, String judgeModel,
+                                 int budget) {
+        boolean exists = Files.isRegularFile(out.resolve("results.json"));
+        if (!resume) {
+            if (exists) {
+                throw new IllegalArgumentException(out + " already has results.json; "
+                        + "pass --resume to continue it, or choose another --out");
+            }
+            return null;
+        }
+        if (!exists) {
+            throw new IllegalArgumentException("--resume needs results.json in --out (" + out + ")");
+        }
+        Report.Saved saved = Report.read(out);
+        Report.Setup s = saved.setup();
+        if (!s.provider().equals(provider) || !s.model().equals(model) || !s.judgeModel().equals(judgeModel)
+                || s.budgetTokens() != budget) {
+            throw new IllegalArgumentException("The results in " + out + " used --provider " + s.provider()
+                    + " --model " + s.model() + " --judge-model " + s.judgeModel() + " --budget " + s.budgetTokens()
+                    + "; resume with the same options");
+        }
+        return saved;
     }
 
     /** Writes the exact messages each condition would send, for inspection before spending credits. */
@@ -139,7 +185,7 @@ public final class EvalMain {
                 throw new IllegalArgumentException("Unexpected argument: " + args[i]);
             }
             String name = args[i].substring(2);
-            if (name.equals("dry-run")) {
+            if (name.equals("dry-run") || name.equals("resume")) {
                 options.put(name, "true");
             } else if (i + 1 < args.length) {
                 options.put(name, args[++i]);

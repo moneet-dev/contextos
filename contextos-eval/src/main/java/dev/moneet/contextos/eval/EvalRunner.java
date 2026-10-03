@@ -3,8 +3,11 @@ package dev.moneet.contextos.eval;
 import dev.moneet.contextos.incident.domain.Incident;
 
 import java.io.PrintStream;
-import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * Asks the model about every case under every condition, {@code runs} times,
@@ -37,24 +40,77 @@ public final class EvalRunner {
     }
 
     public List<Trial> run(List<EvalCase> cases, Settings settings) {
-        List<Trial> trials = new ArrayList<>();
+        return run(cases, settings, List.of(), trials -> { });
+    }
+
+    /**
+     * Runs every trial not already completed in {@code previous}; previous trials that
+     * failed are run again. {@code checkpoint} receives all trials so far, previous ones
+     * included, after each trial, so an interrupted run loses nothing. A fatal error
+     * stops the run after a final checkpoint.
+     */
+    public List<Trial> run(List<EvalCase> cases, Settings settings, List<Trial> previous,
+                           Consumer<List<Trial>> checkpoint) {
+        Map<String, Trial> results = new LinkedHashMap<>();
+        previous.forEach(t -> results.put(key(t.incident(), t.condition(), t.run()), t));
+        Comparator<Trial> order = order(cases);
+
         int total = cases.size() * settings.conditions().size() * settings.runs();
+        int position = 0;
 
         for (EvalCase evalCase : cases) {
             Incident incident = contexts.incident(evalCase.incident());
             for (Condition condition : settings.conditions()) {
-                String context = contexts.build(condition, incident.id(), settings.budgetTokens());
-                int contextTokens = contexts.tokens(context);
+                String context = null;
+                int contextTokens = 0;
 
                 for (int run = 1; run <= settings.runs(); run++) {
-                    Trial trial = trial(evalCase, incident, condition, run, context, contextTokens);
-                    trials.add(trial);
-                    progress.printf("[%d/%d] %s %-20s run %d: %s (%.1fs)%n", trials.size(), total, incident.id(),
+                    position++;
+                    String key = key(incident.id(), condition, run);
+                    Trial done = results.get(key);
+                    if (done != null && done.error() == null) {
+                        progress.printf("[%d/%d] %s %-20s run %d: %s (saved)%n", position, total, incident.id(),
+                                condition.label(), run, outcome(done));
+                        continue;
+                    }
+                    if (context == null) {
+                        context = contexts.build(condition, incident.id(), settings.budgetTokens());
+                        contextTokens = contexts.tokens(context);
+                    }
+
+                    Trial trial;
+                    try {
+                        trial = trial(evalCase, incident, condition, run, context, contextTokens);
+                    } catch (OpenAiCompatibleClient.ApiException fatal) {
+                        checkpoint.accept(sorted(results, order));
+                        throw fatal;
+                    }
+                    results.put(key, trial);
+                    checkpoint.accept(sorted(results, order));
+                    progress.printf("[%d/%d] %s %-20s run %d: %s (%.1fs)%n", position, total, incident.id(),
                             condition.label(), run, outcome(trial), trial.elapsedMs() / 1000.0);
                 }
             }
         }
-        return trials;
+        return sorted(results, order);
+    }
+
+    private static String key(String incident, Condition condition, int run) {
+        return incident + "|" + condition + "|" + run;
+    }
+
+    /** Case order, then condition, then run; trials for cases not in this run go last. */
+    private static Comparator<Trial> order(List<EvalCase> cases) {
+        List<String> incidents = cases.stream().map(EvalCase::incident).toList();
+        return Comparator.<Trial>comparingInt(t -> incidents.contains(t.incident())
+                        ? incidents.indexOf(t.incident()) : Integer.MAX_VALUE)
+                .thenComparing(Trial::incident)
+                .thenComparing(Trial::condition)
+                .thenComparingInt(Trial::run);
+    }
+
+    private static List<Trial> sorted(Map<String, Trial> results, Comparator<Trial> order) {
+        return results.values().stream().sorted(order).toList();
     }
 
     private Trial trial(EvalCase evalCase, Incident incident, Condition condition, int run,

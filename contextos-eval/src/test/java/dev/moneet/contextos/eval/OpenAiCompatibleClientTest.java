@@ -108,17 +108,38 @@ class OpenAiCompatibleClientTest {
     }
 
     @Test
-    void shouldGiveUpAfterRepeatedRateLimits() {
+    void shouldTreatARateLimitThatOutlastsEveryRetryAsAnExhaustedQuota() {
+        String body = "{\"error\": {\"message\": \"You exceeded your current quota.\\n* Quota exceeded for metric: "
+                + "generate_content_free_tier_requests, limit: 20, model: m\\nPlease check your plan.\"}}";
         for (int i = 0; i < 6; i++) {
-            replies.add(new Reply(429, "slow down", "1"));
+            replies.add(new Reply(429, body, "1"));
         }
 
         OpenAiCompatibleClient.ApiException e = assertThrows(OpenAiCompatibleClient.ApiException.class,
                 () -> client("k").complete(List.of(Message.user("q"))));
 
         assertEquals(429, e.status());
+        assertTrue(e.fatal(), "every later call would hit the same quota");
+        assertTrue(e.getMessage().startsWith("Still rate-limited after 6 attempts; likely a daily quota for test-model"),
+                e.getMessage());
+        assertTrue(e.getMessage().endsWith("[quota: generate_content_free_tier_requests, limit: 20, model: m]"),
+                e.getMessage());
         assertEquals(6, requests.size());
         assertEquals(5, sleeps.size());
+    }
+
+    @Test
+    void shouldGiveUpOnPersistentServerErrorsWithoutStoppingTheRun() {
+        for (int i = 0; i < 6; i++) {
+            replies.add(new Reply(503, "overloaded", null));
+        }
+
+        OpenAiCompatibleClient.ApiException e = assertThrows(OpenAiCompatibleClient.ApiException.class,
+                () -> client("k").complete(List.of(Message.user("q"))));
+
+        assertEquals(503, e.status());
+        assertFalse(e.fatal(), "an overloaded model may recover by the next trial");
+        assertEquals(6, requests.size());
     }
 
     @Test

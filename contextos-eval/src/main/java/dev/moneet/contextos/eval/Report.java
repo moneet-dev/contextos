@@ -23,7 +23,20 @@ public final class Report {
                         String startedAt) {
     }
 
+    /** The contents of a {@code results.json}. */
+    public record Saved(Setup setup, List<Trial> trials) {
+    }
+
     private Report() {
+    }
+
+    /** Reads {@code results.json} from {@code dir}, as written by {@link #write}. */
+    public static Saved read(Path dir) {
+        try {
+            return new ObjectMapper().readValue(dir.resolve("results.json").toFile(), Saved.class);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to read " + dir.resolve("results.json"), e);
+        }
     }
 
     public static void write(Path dir, Setup setup, List<Trial> trials) {

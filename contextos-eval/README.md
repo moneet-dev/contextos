@@ -61,6 +61,7 @@ Options:
 | `--max-tokens` | 4096 | Output limit per call. Reasoning models spend part of it thinking; a cut-off answer is recorded as an error, not graded |
 | `--out` | `build/eval/<timestamp>` | Where `report.md` and `results.json` go |
 | `--dry-run` | | Write every prompt to `--out` without calling any API |
+| `--resume` | | Continue the run saved in `--out`: completed trials are kept, failed ones retried |
 
 **Try `--dry-run` first.** It costs nothing and shows exactly what each
 condition sends.
@@ -69,6 +70,28 @@ A full run makes 4 incidents × 3 conditions × `--runs` answer calls, plus one
 judge call each. With the defaults that's 36 + 36 calls of about 4–5k tokens.
 Rate limits (HTTP 429) are retried, waiting as long as the provider asks. A bad
 key, an unknown model or a quota of zero stops the run immediately.
+
+### Free tiers and daily quotas
+
+Free tiers often cap requests per model per day. Gemini's free tier, for
+example, allowed 20 a day per model, while a full run needs 36 answer calls and
+36 judge calls. So the harness:
+- saves `results.json` and `report.md` after every trial
+- stops the run when a rate limit outlasts every retry (likely a daily quota),
+  instead of failing trial after trial
+- stops at once on a model whose quota is 0
+- continues where it left off once the quota resets:
+
+```bash
+./gradlew :contextos-eval:eval --args="--provider gemini --model <m> --judge-model <j> --resume --out build/eval/<run>"
+```
+
+A resumed run must use the same provider, models and budget, so every trial in
+the report is comparable. A new run refuses to overwrite an existing
+`results.json`.
+
+Reasoning models also spend output tokens thinking. An answer cut off at
+`--max-tokens` is recorded as an error rather than graded.
 
 ## Reading the results
 
