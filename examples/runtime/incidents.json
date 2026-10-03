@@ -13,6 +13,48 @@
         "HTTP 5xx on payment-service up 320%",
         "Checkout failures reported by customers"
       ]
+    },
+    {
+      "id": "INC-144",
+      "title": "payment-service 5xx on charges",
+      "severity": "SEV2",
+      "startedAt": "2026-10-07T10:20:00.000Z",
+      "detectedAt": "2026-10-07T10:24:00.000Z",
+      "affectedServices": [
+        "payment-service"
+      ],
+      "symptoms": [
+        "HTTP 5xx on POST /payments",
+        "Checkout failures reported by customers"
+      ]
+    },
+    {
+      "id": "INC-145",
+      "title": "payment-service latency and 5xx",
+      "severity": "SEV2",
+      "startedAt": "2026-10-14T16:40:00.000Z",
+      "detectedAt": "2026-10-14T16:45:00.000Z",
+      "affectedServices": [
+        "payment-service"
+      ],
+      "symptoms": [
+        "POST /payments p99 latency above 10 seconds",
+        "HTTP 5xx on payment-service"
+      ]
+    },
+    {
+      "id": "INC-146",
+      "title": "payment-service 5xx elevated",
+      "severity": "SEV2",
+      "startedAt": "2026-10-21T09:05:00.000Z",
+      "detectedAt": "2026-10-21T09:09:00.000Z",
+      "affectedServices": [
+        "payment-service"
+      ],
+      "symptoms": [
+        "HTTP 5xx on payment-service",
+        "Checkout failures reported by customers"
+      ]
     }
   ]
 }

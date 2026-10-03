@@ -1,5 +1,6 @@
 package dev.moneet.contextos.mcp;
 
+import dev.moneet.contextos.Workspace;
 import io.modelcontextprotocol.server.McpSyncServer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;

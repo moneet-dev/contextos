@@ -1,3 +1,7 @@
 {"timestamp": "2026-09-29T16:20:00.000Z", "service": "payment-service", "type": "DEPLOY", "description": "Deployed v2.14.0: refunds now load transaction history (PaymentTransactionRepository.findByPaymentId)"}
 {"timestamp": "2026-09-30T11:00:00.000Z", "service": "notification-service", "type": "CONFIG", "description": "Rotated SMTP credentials"}
 {"timestamp": "2026-09-30T13:58:00.000Z", "service": "refund-batch", "type": "JOB", "description": "Refund batch REF-0930 started: 48213 payments queued"}
+{"timestamp": "2026-10-07T05:20:00.000Z", "service": "notification-service", "type": "CONFIG", "description": "Updated receipt email templates"}
+{"timestamp": "2026-10-07T10:17:00.000Z", "service": "payment-service", "type": "DEPLOY", "description": "Deployed v2.16.0: PaymentService.charge now builds the receipt from the saved PaymentTransaction"}
+{"timestamp": "2026-10-14T10:40:00.000Z", "service": "checkout-service", "type": "DEPLOY", "description": "Deployed checkout-service v5.2.1: cart page copy changes"}
+{"timestamp": "2026-10-21T09:02:00.000Z", "service": "payment-service", "type": "CONFIG", "description": "spring.datasource.hikari.maximum-pool-size changed from 50 to 5 (reduce database connection count)"}

@@ -1,5 +1,6 @@
 package dev.moneet.contextos.mcp;
 
+import dev.moneet.contextos.Workspace;
 import io.modelcontextprotocol.json.McpJsonMapper;
 import io.modelcontextprotocol.json.jackson3.JacksonMcpJsonMapper;
 import io.modelcontextprotocol.server.McpServer;
