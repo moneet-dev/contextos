@@ -2,6 +2,7 @@ package dev.moneet.contextos.incident.context;
 
 import dev.moneet.contextos.core.graph.Reached;
 import dev.moneet.contextos.incident.domain.Evidence;
+import dev.moneet.contextos.incident.domain.HealthySignal;
 import dev.moneet.contextos.incident.domain.Incident;
 import dev.moneet.contextos.incident.domain.Service;
 import dev.moneet.contextos.incident.domain.ServiceDependency;
@@ -15,9 +16,9 @@ import java.util.Comparator;
 import java.util.List;
 
 /**
- * Renders an incident context as four sections: the incident, the services in
- * scope, a timeline of evidence by onset, and the evidence ranked with reasons
- * and telemetry sources. Times are UTC; dates are shown only when they differ
+ * Renders an incident context as sections: the incident, the services in scope,
+ * a timeline of evidence by onset, the evidence ranked with reasons and
+ * telemetry sources, and the signals that stayed healthy. Times are UTC; dates are shown only when they differ
  * from the incident start date.
  */
 public final class IncidentRenderer {
@@ -30,6 +31,7 @@ public final class IncidentRenderer {
     public String render(Incident incident,
                          List<Reached<ServiceDependency>> scope,
                          List<RankedEvidence> evidence,
+                         List<HealthySignal> healthy,
                          ServiceGraph graph) {
 
         StringBuilder sb = new StringBuilder();
@@ -55,6 +57,18 @@ public final class IncidentRenderer {
             sb.append("    source: ").append(sources(e)).append("\n");
         }
 
+        if (!healthy.isEmpty()) {
+            sb.append("\n").append(healthy(healthy));
+        }
+        return sb.toString();
+    }
+
+    /** Signals that stayed normal on the affected services and their dependencies. */
+    public String healthy(List<HealthySignal> healthy) {
+        StringBuilder sb = new StringBuilder("HEALTHY SIGNALS (no anomaly during the window)\n");
+        for (HealthySignal signal : healthy) {
+            sb.append(String.format("  %-20s %s\n", signal.service(), signal.summary()));
+        }
         return sb.toString();
     }
 

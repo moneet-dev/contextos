@@ -63,6 +63,17 @@ class IncidentContextProviderTest {
     }
 
     @Test
+    void shouldAddHealthySignalsItem() {
+        ContextItem healthy = provider.collect(ContextRequest.of("INC-146", 2)).get(1);
+
+        assertEquals("incident:INC-146:healthy", healthy.id());
+        assertEquals("HEALTHY_SIGNALS", healthy.kind());
+        assertEquals(IncidentContextProvider.HEALTHY_SCORE, healthy.score());
+        assertTrue(healthy.content().contains("payments-db") && healthy.content().contains("query_p99_ms"));
+        assertTrue(healthy.reason().startsWith("rules out causes"));
+    }
+
+    @Test
     void shouldPackOverviewFirstUnderBudget() {
         ContextPackage pkg = provider.provide(new ContextRequest("INC-143", 2, ContextBudget.tokens(500)));
 

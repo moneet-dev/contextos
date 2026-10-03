@@ -22,7 +22,7 @@ proposed.
 | INC-143 | Refund batch + slow `payment_transactions` lookup (no index on `payment_id`) exhausts the connection pool | The cause is in the database schema, three steps from the symptom |
 | INC-144 | Deploy v2.16.0 introduced a `NullPointerException` in `PaymentService.charge` | An unrelated config change and fraud-api warnings are also in the window |
 | INC-145 | Third-party fraud-api slows to ~9 s; `HttpFraudCheckClient` calls time out | An unrelated checkout-service deploy is also in the window |
-| INC-146 | Config change cut the connection pool from 50 to 5 | Same pool-exhaustion errors as INC-143, but the database is healthy |
+| INC-146 | Config change cut the connection pool from 50 to 5 | Same pool-exhaustion errors as INC-143, but the database is healthy (shown by ContextOS's healthy signals) |
 
 The fixtures are generated deterministically by
 [`examples/runtime/generate_fixtures.py`](../examples/runtime/generate_fixtures.py).
