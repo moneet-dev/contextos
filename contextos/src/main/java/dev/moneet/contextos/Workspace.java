@@ -1,7 +1,5 @@
-package dev.moneet.contextos.mcp;
+package dev.moneet.contextos;
 
-import dev.moneet.contextos.ContextOS;
-import dev.moneet.contextos.SqlScript;
 import dev.moneet.contextos.code.domain.CodeRepository;
 import dev.moneet.contextos.code.source.JavaRepositorySource;
 import dev.moneet.contextos.incident.domain.RuntimeSnapshot;
@@ -25,9 +23,10 @@ import java.util.Objects;
  * &lt;repository&gt;/                  source code, named as in a service's "repository"
  * </pre>
  * Each DDL script is loaded into in-memory SQLite and read back through SQL
- * Schema Context.
+ * Schema Context. Used by the MCP server and the evaluation.
  */
-public record Workspace(RuntimeSnapshot runtime,
+public record Workspace(Path root,
+                        RuntimeSnapshot runtime,
                         String repositoryName,
                         CodeRepository repository,
                         String databaseName,
@@ -65,7 +64,7 @@ public record Workspace(RuntimeSnapshot runtime,
                 ? null
                 : loadSchema(runtimeDir.resolve("databases/" + databaseName + ".sql"));
 
-        return new Workspace(runtime, repositoryName, repository, databaseName, schema);
+        return new Workspace(root, runtime, repositoryName, repository, databaseName, schema);
     }
 
     public ContextOS contextOS() {

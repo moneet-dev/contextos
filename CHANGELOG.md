@@ -23,7 +23,10 @@ and has no dependency on them.
   under one budget
 - `contextos-mcp`: stdio MCP server with `list_incidents`, `investigate_incident`,
   `code_context` and `schema_context` tools
-- `examples/`: payment-service codebase, INC-143 runtime snapshot, payments-db schema
+- `contextos-eval`: evaluation harness comparing raw telemetry, incident context and
+  cross-domain context, for any OpenAI-compatible model API
+- `examples/`: payment-service codebase, runtime snapshot with incidents INC-143 to INC-146
+  (`generate_fixtures.py`), payments-db schema, evaluation rubrics
 
 ### Architectural Decisions
 

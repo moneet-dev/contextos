@@ -1,5 +1,6 @@
 package dev.moneet.contextos.mcp;
 
+import dev.moneet.contextos.Workspace;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

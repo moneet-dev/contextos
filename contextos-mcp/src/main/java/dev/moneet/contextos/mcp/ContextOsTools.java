@@ -2,6 +2,7 @@ package dev.moneet.contextos.mcp;
 
 import dev.moneet.contextos.ContextOS;
 import dev.moneet.contextos.CrossDomainContext;
+import dev.moneet.contextos.Workspace;
 import dev.moneet.contextos.code.context.CodeContextProvider;
 import dev.moneet.contextos.code.graph.CodeGraphBuilder;
 import dev.moneet.contextos.core.context.ContextBudget;

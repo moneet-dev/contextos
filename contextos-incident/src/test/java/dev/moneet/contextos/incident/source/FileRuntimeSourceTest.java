@@ -40,10 +40,11 @@ class FileRuntimeSourceTest {
         assertEquals(Instant.parse("2026-09-30T14:02:00Z"), incident.startedAt());
         assertEquals(java.util.List.of("payment-service"), incident.affectedServices());
 
-        assertEquals(153, snapshot.getTelemetry().getLogs().size());
-        assertEquals(728, snapshot.getTelemetry().getMetrics().size());
-        assertEquals(302, snapshot.getTelemetry().getSpans().size());
-        assertEquals(3, snapshot.getTelemetry().getChanges().size());
+        assertEquals(383, snapshot.getTelemetry().getLogs().size());
+        assertEquals(2912, snapshot.getTelemetry().getMetrics().size());
+        assertEquals(1013, snapshot.getTelemetry().getSpans().size());
+        assertEquals(7, snapshot.getTelemetry().getChanges().size());
+        assertEquals(4, snapshot.getIncidents().size());
     }
 
     @Test

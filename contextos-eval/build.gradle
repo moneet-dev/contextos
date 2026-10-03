@@ -1,0 +1,35 @@
+plugins {
+    id 'java'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+// Evaluation harness: asks a model about each incident with different contexts
+// and scores the answers. Talks to any OpenAI-compatible chat completions API.
+dependencies {
+    implementation project(':contextos')
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.2'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    systemProperty 'contextos.examples', rootProject.file('examples').absolutePath
+}
+
+// ./gradlew :contextos-eval:eval --args="--provider groq --model <model> [--dry-run]"
+tasks.register('eval', JavaExec) {
+    group = 'verification'
+    description = 'Runs the ContextOS evaluation against an OpenAI-compatible model API.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'dev.moneet.contextos.eval.EvalMain'
+    workingDir = rootProject.projectDir
+}
