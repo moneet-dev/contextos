@@ -9,8 +9,8 @@ import java.util.List;
 /**
  * Asks the model about every case under every condition, {@code runs} times,
  * and grades each answer. Calls are sequential, which keeps free-tier rate
- * limits manageable. A failed call is recorded on its trial; configuration
- * errors (bad key, unknown model) stop the run.
+ * limits manageable. A failed call is recorded on its trial; errors no later
+ * call can recover from (bad key, unknown model, zero quota) stop the run.
  */
 public final class EvalRunner {
 
@@ -65,7 +65,7 @@ public final class EvalRunner {
             List<Judge.Grade> grades = judge.grade(evalCase, answer);
             return new Trial(incident.id(), condition, run, contextTokens, answer, grades, null, elapsed(started));
         } catch (OpenAiCompatibleClient.ApiException e) {
-            if (e.status() == 401 || e.status() == 403 || e.status() == 404) {
+            if (e.fatal()) {
                 throw e;
             }
             return failed(incident, condition, run, contextTokens, e, started);

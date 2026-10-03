@@ -30,6 +30,7 @@ import java.util.Map;
  * --incidents    comma-separated ids (default: all cases)
  * --conditions   comma-separated: raw_telemetry, incident_context, cross_domain (default: all)
  * --temperature  sampling temperature for answers (default 0.2; the judge uses 0)
+ * --max-tokens   output token limit per call, including any reasoning (default 4096)
  * --examples     workspace directory (default examples)
  * --cases        rubric file (default examples/eval/cases.json)
  * --out          output directory (default build/eval/&lt;timestamp&gt;)
@@ -96,9 +97,10 @@ public final class EvalMain {
                     + "(or pass --api-key-env with the variable you use).");
         }
         double temperature = Double.parseDouble(options.getOrDefault("temperature", "0.2"));
+        int maxTokens = integer(options, "max-tokens", 4096);
 
-        ChatModel subject = new OpenAiCompatibleClient(baseUrl, model, apiKey, temperature, 1024);
-        Judge judge = new Judge(new OpenAiCompatibleClient(baseUrl, judgeModel, apiKey, 0.0, 1024));
+        ChatModel subject = new OpenAiCompatibleClient(baseUrl, model, apiKey, temperature, maxTokens);
+        Judge judge = new Judge(new OpenAiCompatibleClient(baseUrl, judgeModel, apiKey, 0.0, maxTokens));
 
         System.out.printf("Evaluating %s via %s: %d incident(s) x %d condition(s) x %d run(s), budget %d tokens%n",
                 model, provider.name().toLowerCase(), cases.size(), conditions.size(), runs, budget);

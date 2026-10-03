@@ -58,6 +58,7 @@ Options:
 | `--incidents` | all | e.g. `INC-143,INC-146` |
 | `--conditions` | all | e.g. `raw_telemetry,cross_domain` |
 | `--temperature` | 0.2 | For answers; the judge always uses 0 |
+| `--max-tokens` | 4096 | Output limit per call. Reasoning models spend part of it thinking; a cut-off answer is recorded as an error, not graded |
 | `--out` | `build/eval/<timestamp>` | Where `report.md` and `results.json` go |
 | `--dry-run` | | Write every prompt to `--out` without calling any API |
 
@@ -66,8 +67,8 @@ condition sends.
 
 A full run makes 4 incidents × 3 conditions × `--runs` answer calls, plus one
 judge call each. With the defaults that's 36 + 36 calls of about 4–5k tokens.
-Rate limits (HTTP 429) are retried with backoff. A bad key or unknown model
-stops the run immediately.
+Rate limits (HTTP 429) are retried, waiting as long as the provider asks. A bad
+key, an unknown model or a quota of zero stops the run immediately.
 
 ## Reading the results
 

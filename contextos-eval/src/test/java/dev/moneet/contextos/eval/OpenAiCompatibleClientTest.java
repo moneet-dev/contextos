@@ -122,6 +122,42 @@ class OpenAiCompatibleClientTest {
     }
 
     @Test
+    void shouldStopAtOnceWhenTheQuotaIsZero() {
+        replies.add(new Reply(429, "{\"error\": {\"code\": 429, \"message\": \"You exceeded your current quota. "
+                + "Quota exceeded for metric: generate_content_free_tier_requests, limit: 0, model: pro\"}}", null));
+
+        OpenAiCompatibleClient.ApiException e = assertThrows(OpenAiCompatibleClient.ApiException.class,
+                () -> client("k").complete(List.of(Message.user("q"))));
+
+        assertTrue(e.fatal());
+        assertTrue(e.getMessage().startsWith("The quota for model test-model is 0"), e.getMessage());
+        assertEquals(1, requests.size(), "a zero quota is not retried");
+    }
+
+    @Test
+    void shouldWaitForTheDelayGivenInTheBody() {
+        replies.add(new Reply(429, "{\"error\": {\"message\": \"Quota exceeded for metric: requests, limit: 10. "
+                + "Please retry in 12.4s.\", \"details\": [{\"retryDelay\": \"12s\"}]}}", null));
+        replies.add(new Reply(200, completion("ok"), null));
+
+        assertEquals("ok", client("k").complete(List.of(Message.user("q"))));
+        assertEquals(List.of(Duration.ofMillis(12_900)), sleeps, "first delay given (12.4 s) plus a 0.5 s margin");
+    }
+
+    @Test
+    void shouldRejectAnswersCutOffByTheTokenLimit() {
+        replies.add(new Reply(200, JSON.createObjectNode().set("choices", JSON.createArrayNode().add(
+                JSON.createObjectNode().put("finish_reason", "length").set("message",
+                        JSON.createObjectNode().put("content", "{\"root_cause\": \"the da")))).toString(), null));
+
+        OpenAiCompatibleClient.ApiException e = assertThrows(OpenAiCompatibleClient.ApiException.class,
+                () -> client("k").complete(List.of(Message.user("q"))));
+
+        assertEquals("Response truncated at max_tokens=512; raise --max-tokens", e.getMessage());
+        assertFalse(e.fatal());
+    }
+
+    @Test
     void shouldRejectResponsesWithoutContent() {
         replies.add(new Reply(200, "{\"choices\": []}", null));
 
