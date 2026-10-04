@@ -28,6 +28,30 @@ tasks.named('test') {
 //   java -jar contextos-mcp/build/libs/contextos-mcp-all.jar <examples-dir>
 // A Jar task rather than the 'application' plugin, so the root project's
 // `./gradlew run` keeps running only the SQL Schema Context demo.
+// Several libraries register implementations of the same service (e.g. both the SQLite and
+// PostgreSQL drivers list META-INF/services/java.sql.Driver). In one jar those files must be
+// merged; keeping only one copy would silently drop a driver.
+def mergedServices = layout.buildDirectory.dir('merged-services')
+tasks.register('mergeServiceFiles') {
+    inputs.files(configurations.runtimeClasspath)
+    outputs.dir(mergedServices)
+    doLast {
+        def providers = [:].withDefault { new LinkedHashSet<String>() }
+        configurations.runtimeClasspath.files.findAll { it.name.endsWith('.jar') }.each { jar ->
+            zipTree(jar).matching { include 'META-INF/services/*' }.each { file ->
+                file.readLines('UTF-8').collect { it.replaceAll('#.*', '').trim() }.findAll { it }
+                        .each { providers[file.name] << it }
+            }
+        }
+        def dir = new File(mergedServices.get().asFile, 'META-INF/services')
+        project.delete(mergedServices)
+        dir.mkdirs()
+        providers.each { service, implementations ->
+            new File(dir, service).write(implementations.join(System.lineSeparator()) + System.lineSeparator(), 'UTF-8')
+        }
+    }
+}
+
 tasks.register('serverJar', Jar) {
     group = 'build'
     description = 'Builds a runnable jar with all dependencies.'
@@ -35,10 +59,13 @@ tasks.register('serverJar', Jar) {
     manifest {
         attributes 'Main-Class': 'dev.moneet.contextos.mcp.ContextOsMcpServer'
     }
+    dependsOn 'mergeServiceFiles', configurations.runtimeClasspath
     from sourceSets.main.output
-    dependsOn configurations.runtimeClasspath
-    from {
+    from mergedServices
+    from({
         configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }) {
+        exclude 'META-INF/services/**'
     }
     exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA', 'module-info.class'
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
