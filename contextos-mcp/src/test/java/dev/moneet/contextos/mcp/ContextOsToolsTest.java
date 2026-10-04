@@ -22,9 +22,9 @@ class ContextOsToolsTest {
     void shouldLoadExamplesWorkspace() {
         Workspace workspace = Workspace.load(Path.of(System.getProperty("contextos.examples")));
 
-        assertEquals("payment-service", workspace.repositoryName());
-        assertEquals("payments-db", workspace.databaseName());
-        assertEquals(5, workspace.schema().getTables().size());
+        assertEquals(java.util.Set.of("payment-service"), workspace.repositories().keySet());
+        assertEquals(java.util.Set.of("payments-db"), workspace.databases().keySet());
+        assertEquals(5, workspace.databases().get("payments-db").getTables().size());
     }
 
     @Test
@@ -33,8 +33,8 @@ class ContextOsToolsTest {
 
         assertTrue(list.startsWith("INC-143 [SEV2] payment-service 5xx elevated\n"), list);
         assertTrue(list.contains("affected: payment-service"));
-        assertTrue(list.contains("Code repository: payment-service"));
-        assertTrue(list.contains("Database: payments-db"));
+        assertTrue(list.contains("Code repositories: payment-service"));
+        assertTrue(list.contains("Databases: payments-db"));
     }
 
     @Test
@@ -79,6 +79,28 @@ class ContextOsToolsTest {
         assertThrows(IllegalArgumentException.class, () -> tools.investigateIncident("INC-143", 10));
         assertThrows(IllegalArgumentException.class, () -> tools.codeContext("PaymentService", 9, null));
         assertThrows(IllegalArgumentException.class, () -> tools.codeContext(" ", null, null));
+    }
+
+    @Test
+    void shouldServeCodeAndSchemaWithoutARuntimeAndAskWhichDatabase(@TempDir Path dir) throws Exception {
+        Path examples = Path.of(System.getProperty("contextos.examples")).toAbsolutePath();
+        String ddl = examples.resolve("runtime/databases/payments-db.sql").toString().replace('\\', '/');
+        java.nio.file.Files.writeString(dir.resolve("contextos.json"), """
+                {"repositories": {"payments": "%s"},
+                 "databases": {"primary": {"ddl": "%s"}, "replica": {"ddl": "%s"}}}
+                """.formatted(examples.resolve("payment-service").toString().replace('\\', '/'), ddl, ddl));
+        ContextOsTools noRuntime = new ContextOsTools(Workspace.load(dir));
+
+        assertTrue(noRuntime.listIncidents().startsWith("No runtime is configured"));
+        assertThrows(IllegalArgumentException.class, () -> noRuntime.investigateIncident("INC-143", null));
+        assertTrue(noRuntime.codeContext("PaymentService#refund", 1, null).contains("PaymentService#refund"));
+
+        IllegalArgumentException which = assertThrows(IllegalArgumentException.class,
+                () -> noRuntime.schemaContext("payments", 0, null));
+        assertEquals("Several databases are configured; pass database as one of [primary, replica]",
+                which.getMessage());
+        assertTrue(noRuntime.schemaContext("replica", "payments", 0, null).contains("Table payments:"));
+        assertThrows(IllegalArgumentException.class, () -> noRuntime.schemaContext("nope", "payments", 0, null));
     }
 
     @Test

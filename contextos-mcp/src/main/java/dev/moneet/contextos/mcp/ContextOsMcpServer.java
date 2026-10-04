@@ -28,7 +28,8 @@ import java.util.function.Function;
 /**
  * ContextOS as an MCP server over stdio.
  *
- * <p>Usage: {@code java -jar contextos-mcp-all.jar [examples-dir]} (default {@code examples}).
+ * <p>Usage: {@code java -jar contextos-mcp-all.jar [contextos.json or a directory containing it]}
+ * (default {@code examples}). See the contextos module README for the config format.
  * Stdout carries only protocol messages; diagnostics go to stderr.
  */
 public final class ContextOsMcpServer {
@@ -101,22 +102,26 @@ public final class ContextOsMcpServer {
                                 + "Query by Type, Type#method, Type#method(Param), method name or file path.",
                         schema(Map.of(
                                 "query", property("string", "Symbol query, e.g. PaymentService#refund"),
+                                "repository", property("string",
+                                        "Repository name; needed only when several are configured"),
                                 "depth", property("integer", "Relationship hops to follow (default 2)"),
                                 "budget", property("integer", "Token budget (default 4000)")),
                                 List.of("query")),
-                        args -> tools.codeContext(string(args, "query"), integer(args, "depth"),
-                                integer(args, "budget"))),
+                        args -> tools.codeContext(string(args, "repository"), string(args, "query"),
+                                integer(args, "depth"), integer(args, "budget"))),
 
                 tool("schema_context",
                         "Database schema context around a table: columns, keys, indexes, and related tables "
                                 + "with join conditions and join quality. An empty table returns the whole schema.",
                         schema(Map.of(
                                 "table", property("string", "Table name, e.g. payment_transactions"),
+                                "database", property("string",
+                                        "Database name; needed only when several are configured"),
                                 "depth", property("integer", "Foreign-key hops to follow (default 1)"),
                                 "budget", property("integer", "Token budget (default 4000)")),
                                 List.of("table")),
-                        args -> tools.schemaContext(string(args, "table"), integer(args, "depth"),
-                                integer(args, "budget"))));
+                        args -> tools.schemaContext(string(args, "database"), string(args, "table"),
+                                integer(args, "depth"), integer(args, "budget"))));
     }
 
     private static SyncToolSpecification tool(String name,
