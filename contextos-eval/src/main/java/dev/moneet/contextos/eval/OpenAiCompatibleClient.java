@@ -12,16 +12,22 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Client for OpenAI-compatible {@code POST /chat/completions} endpoints (Groq,
  * OpenRouter, Gemini, Mistral, GitHub Models, Cerebras, Ollama, ...).
  *
  * <p>Rate limits (429) and transient server errors (5xx) are retried with
- * backoff, honouring {@code Retry-After}; free tiers hit rate limits routinely.
- * Authentication and other client errors fail immediately.
+ * backoff, honouring the server's requested delay; free tiers hit rate limits
+ * routinely. Authentication errors, other client errors and a quota of zero fail
+ * immediately, as does an answer cut off by {@code max_tokens}. A rate limit that
+ * outlasts every retry is treated as an exhausted quota and stops the run.
  */
 public final class OpenAiCompatibleClient implements ChatModel {
 
@@ -29,14 +35,25 @@ public final class OpenAiCompatibleClient implements ChatModel {
     public static final class ApiException extends RuntimeException {
 
         private final int status;
+        private final boolean fatal;
 
         ApiException(int status, String message) {
+            this(status, message, false);
+        }
+
+        ApiException(int status, String message, boolean fatal) {
             super(message);
             this.status = status;
+            this.fatal = fatal;
         }
 
         public int status() {
             return status;
+        }
+
+        /** True when no later call can succeed either: bad credentials, unknown model, zero quota. */
+        public boolean fatal() {
+            return fatal || status == 401 || status == 403 || status == 404;
         }
     }
 
@@ -47,6 +64,10 @@ public final class OpenAiCompatibleClient implements ChatModel {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final int MAX_ATTEMPTS = 6;
     private static final Duration MAX_BACKOFF = Duration.ofSeconds(60);
+    private static final Pattern ZERO_QUOTA = Pattern.compile("limit: 0\\b");
+    private static final Pattern QUOTA_METRIC = Pattern.compile("Quota exceeded for metric: ([^\\\\\"]+)");
+    private static final Pattern RETRY_DELAY = Pattern.compile(
+            "\"retryDelay\"\\s*:\\s*\"(\\d+(?:\\.\\d+)?)s\"|retry in (\\d+(?:\\.\\d+)?)s");
 
     private final String baseUrl;
     private final String model;
@@ -89,9 +110,20 @@ public final class OpenAiCompatibleClient implements ChatModel {
             if (status == 200) {
                 return content(response.body());
             }
+            if (status == 429 && ZERO_QUOTA.matcher(response.body()).find()) {
+                // e.g. Gemini's free tier has no quota at all for some models
+                throw new ApiException(status, "The quota for model " + model + " is 0 on this key: "
+                        + describe(response.body()), true);
+            }
+            if (status == 429 && attempt == MAX_ATTEMPTS) {
+                // Waited out every backoff (over a minute) and still limited: a daily or account
+                // quota, which every later call would hit too
+                throw new ApiException(status, "Still rate-limited after " + MAX_ATTEMPTS + " attempts; "
+                        + "likely a daily quota for " + model + ": " + describe(response.body()), true);
+            }
             boolean retryable = status == 429 || status >= 500;
             if (!retryable || attempt == MAX_ATTEMPTS) {
-                throw new ApiException(status, "HTTP " + status + " from " + baseUrl + ": " + excerpt(response.body()));
+                throw new ApiException(status, "HTTP " + status + " from " + baseUrl + ": " + describe(response.body()));
             }
             pause(backoff(response, attempt));
         }
@@ -131,10 +163,15 @@ public final class OpenAiCompatibleClient implements ChatModel {
         }
     }
 
-    private static String content(String responseBody) {
+    private String content(String responseBody) {
         try {
-            JsonNode message = JSON.readTree(responseBody).path("choices").path(0).path("message");
-            JsonNode content = message.path("content");
+            JsonNode choice = JSON.readTree(responseBody).path("choices").path(0);
+            // Reasoning models spend output tokens thinking; a cut-off answer must not be graded as complete
+            if ("length".equals(choice.path("finish_reason").asText())) {
+                throw new ApiException(200, "Response truncated at max_tokens=" + maxTokens
+                        + "; raise --max-tokens");
+            }
+            JsonNode content = choice.path("message").path("content");
             if (content.isMissingNode() || content.isNull()) {
                 throw new ApiException(200, "Response has no message content: " + excerpt(responseBody));
             }
@@ -144,19 +181,29 @@ public final class OpenAiCompatibleClient implements ChatModel {
         }
     }
 
-    /** Retry-After (seconds) when given, otherwise 2, 4, 8, ... seconds, capped at a minute. */
+    /**
+     * The server's requested delay when it gives one, in the Retry-After header or (as Gemini does)
+     * in the body; otherwise 2, 4, 8, ... seconds. Capped at a minute.
+     */
     static Duration backoff(HttpResponse<String> response, int attempt) {
         Optional<String> retryAfter = response.headers().firstValue("Retry-After");
         if (retryAfter.isPresent()) {
             try {
-                Duration requested = Duration.ofMillis((long) (Double.parseDouble(retryAfter.get().trim()) * 1000));
-                return requested.compareTo(MAX_BACKOFF) > 0 ? MAX_BACKOFF : requested;
+                return capped(Duration.ofMillis((long) (Double.parseDouble(retryAfter.get().trim()) * 1000)));
             } catch (NumberFormatException e) {
-                // an HTTP date; fall back to exponential backoff
+                // an HTTP date; try the body, then exponential backoff
             }
         }
-        Duration exponential = Duration.ofSeconds(1L << Math.min(attempt, 6));
-        return exponential.compareTo(MAX_BACKOFF) > 0 ? MAX_BACKOFF : exponential;
+        Matcher delay = RETRY_DELAY.matcher(response.body() == null ? "" : response.body());
+        if (delay.find()) {
+            String seconds = delay.group(1) != null ? delay.group(1) : delay.group(2);
+            return capped(Duration.ofMillis((long) (Double.parseDouble(seconds) * 1000) + 500));
+        }
+        return capped(Duration.ofSeconds(1L << Math.min(attempt, 6)));
+    }
+
+    private static Duration capped(Duration duration) {
+        return duration.compareTo(MAX_BACKOFF) > 0 ? MAX_BACKOFF : duration;
     }
 
     private void pause(Duration duration) {
@@ -166,6 +213,17 @@ public final class OpenAiCompatibleClient implements ChatModel {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Interrupted", e);
         }
+    }
+
+    /** The start of the body, plus any quota it names, which providers often put past the start. */
+    private static String describe(String body) {
+        Set<String> quotas = new LinkedHashSet<>();
+        Matcher matcher = QUOTA_METRIC.matcher(body == null ? "" : body);
+        while (matcher.find()) {
+            quotas.add(matcher.group(1).trim());
+        }
+        String text = excerpt(body);
+        return quotas.isEmpty() ? text : text + " [quota: " + String.join("; ", quotas) + "]";
     }
 
     private static String excerpt(String body) {

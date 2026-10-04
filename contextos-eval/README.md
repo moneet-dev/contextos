@@ -22,7 +22,7 @@ proposed.
 | INC-143 | Refund batch + slow `payment_transactions` lookup (no index on `payment_id`) exhausts the connection pool | The cause is in the database schema, three steps from the symptom |
 | INC-144 | Deploy v2.16.0 introduced a `NullPointerException` in `PaymentService.charge` | An unrelated config change and fraud-api warnings are also in the window |
 | INC-145 | Third-party fraud-api slows to ~9 s; `HttpFraudCheckClient` calls time out | An unrelated checkout-service deploy is also in the window |
-| INC-146 | Config change cut the connection pool from 50 to 5 | Same pool-exhaustion errors as INC-143, but the database is healthy |
+| INC-146 | Config change cut the connection pool from 50 to 5 | Same pool-exhaustion errors as INC-143, but the database is healthy (shown by ContextOS's healthy signals) |
 
 The fixtures are generated deterministically by
 [`examples/runtime/generate_fixtures.py`](../examples/runtime/generate_fixtures.py).
@@ -58,16 +58,40 @@ Options:
 | `--incidents` | all | e.g. `INC-143,INC-146` |
 | `--conditions` | all | e.g. `raw_telemetry,cross_domain` |
 | `--temperature` | 0.2 | For answers; the judge always uses 0 |
+| `--max-tokens` | 4096 | Output limit per call. Reasoning models spend part of it thinking; a cut-off answer is recorded as an error, not graded |
 | `--out` | `build/eval/<timestamp>` | Where `report.md` and `results.json` go |
 | `--dry-run` | | Write every prompt to `--out` without calling any API |
+| `--resume` | | Continue the run saved in `--out`: completed trials are kept, failed ones retried |
 
 **Try `--dry-run` first.** It costs nothing and shows exactly what each
 condition sends.
 
 A full run makes 4 incidents × 3 conditions × `--runs` answer calls, plus one
 judge call each. With the defaults that's 36 + 36 calls of about 4–5k tokens.
-Rate limits (HTTP 429) are retried with backoff. A bad key or unknown model
-stops the run immediately.
+Rate limits (HTTP 429) are retried, waiting as long as the provider asks. A bad
+key, an unknown model or a quota of zero stops the run immediately.
+
+### Free tiers and daily quotas
+
+Free tiers often cap requests per model per day. Gemini's free tier, for
+example, allowed 20 a day per model, while a full run needs 36 answer calls and
+36 judge calls. So the harness:
+- saves `results.json` and `report.md` after every trial
+- stops the run when a rate limit outlasts every retry (likely a daily quota),
+  instead of failing trial after trial
+- stops at once on a model whose quota is 0
+- continues where it left off once the quota resets:
+
+```bash
+./gradlew :contextos-eval:eval --args="--provider gemini --model <m> --judge-model <j> --resume --out build/eval/<run>"
+```
+
+A resumed run must use the same provider, models and budget, so every trial in
+the report is comparable. A new run refuses to overwrite an existing
+`results.json`.
+
+Reasoning models also spend output tokens thinking. An answer cut off at
+`--max-tokens` is recorded as an error rather than graded.
 
 ## Reading the results
 

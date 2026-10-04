@@ -25,6 +25,8 @@ and has no dependency on them.
   `code_context` and `schema_context` tools
 - `contextos-eval`: evaluation harness comparing raw telemetry, incident context and
   cross-domain context, for any OpenAI-compatible model API
+- Incident context lists healthy signals (metrics within baseline, normal dependency
+  calls) for the affected services and their dependencies, to rule causes out
 - `examples/`: payment-service codebase, runtime snapshot with incidents INC-143 to INC-146
   (`generate_fixtures.py`), payments-db schema, evaluation rubrics
 

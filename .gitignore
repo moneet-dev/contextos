@@ -5,3 +5,5 @@
 build
 
 .idea/
+# Local secrets (API keys)
+.env

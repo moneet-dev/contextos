@@ -108,6 +108,37 @@ class IncidentContextEngineTest {
     }
 
     @Test
+    void shouldReportHealthySignalsThatRuleOutCauses() {
+        // INC-146: same pool errors as INC-143, but the database and refund traffic stayed normal
+        IncidentContext inc146 = generate(new FocusedIncidentStrategy("INC-146", 2));
+        List<String> healthy146 = inc146.healthy().stream().map(h -> h.service() + " " + h.signal()).toList();
+        assertTrue(healthy146.contains("payments-db query_p99_ms"), healthy146.toString());
+        assertTrue(healthy146.contains("payment-service refund_requests_per_min"), healthy146.toString());
+        assertTrue(healthy146.contains("payment-service SELECT payment_transactions -> payments-db"),
+                healthy146.toString());
+        assertTrue(inc146.rendered().contains("HEALTHY SIGNALS (no anomaly during the window)\n"));
+
+        // INC-143: the slow database is an anomaly, so it must not be reported as healthy
+        List<String> healthy143 = generate(new FocusedIncidentStrategy("INC-143", 2)).healthy().stream()
+                .map(h -> h.service() + " " + h.signal()).toList();
+        assertTrue(healthy143.contains("fraud-api p99_latency_ms"), healthy143.toString());
+        assertFalse(healthy143.contains("payments-db query_p99_ms"), healthy143.toString());
+        assertFalse(healthy143.contains("payment-service SELECT payment_transactions -> payments-db"),
+                healthy143.toString());
+        assertFalse(healthy143.contains("payment-service refund_requests_per_min"), healthy143.toString());
+    }
+
+    @Test
+    void shouldTakeHealthySignalsOnlyFromAffectedServicesAndTheirDependencies() {
+        IncidentContext context = generate(new FocusedIncidentStrategy("INC-143", 2));
+
+        assertTrue(context.healthy().stream().map(h -> h.service())
+                        .allMatch(s -> s.equals("payment-service") || s.equals("fraud-api")
+                                || s.equals("payments-db") || s.equals("payment-events")),
+                "callers such as checkout-service are effects, not candidate causes");
+    }
+
+    @Test
     void shouldRejectUnknownIncident() {
         assertThrows(IllegalArgumentException.class,
                 () -> generate(new FocusedIncidentStrategy("INC-999", 2)));

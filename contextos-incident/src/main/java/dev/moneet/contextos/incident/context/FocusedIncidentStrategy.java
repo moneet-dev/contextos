@@ -2,6 +2,7 @@ package dev.moneet.contextos.incident.context;
 
 import dev.moneet.contextos.core.graph.Reached;
 import dev.moneet.contextos.incident.domain.Evidence;
+import dev.moneet.contextos.incident.domain.HealthySignal;
 import dev.moneet.contextos.incident.domain.Incident;
 import dev.moneet.contextos.incident.domain.RuntimeSnapshot;
 import dev.moneet.contextos.incident.domain.ServiceDependency;
@@ -9,6 +10,7 @@ import dev.moneet.contextos.incident.evidence.AnalysisWindow;
 import dev.moneet.contextos.incident.evidence.ChangeEvidenceCollector;
 import dev.moneet.contextos.incident.evidence.EvidenceCollector;
 import dev.moneet.contextos.incident.evidence.EvidenceRanker;
+import dev.moneet.contextos.incident.evidence.HealthySignalCollector;
 import dev.moneet.contextos.incident.evidence.LogEvidenceCollector;
 import dev.moneet.contextos.incident.evidence.MetricEvidenceCollector;
 import dev.moneet.contextos.incident.evidence.RankedEvidence;
@@ -23,9 +25,12 @@ import java.util.stream.Collectors;
 
 /**
  * Context for one incident: the services within {@code depth} hops of the
- * affected services, and ranked evidence from their telemetry.
+ * affected services, ranked evidence from their telemetry, and the signals that
+ * stayed healthy on the affected services and their direct dependencies.
  */
 public final class FocusedIncidentStrategy implements IncidentContextStrategy {
+
+    private static final int MAX_HEALTHY_SIGNALS = 12;
 
     private final String incidentId;
     private final int depth;
@@ -38,6 +43,7 @@ public final class FocusedIncidentStrategy implements IncidentContextStrategy {
             new MetricEvidenceCollector(),
             new TraceEvidenceCollector());
     private final EvidenceRanker ranker = new EvidenceRanker();
+    private final HealthySignalCollector healthySignals = new HealthySignalCollector(MAX_HEALTHY_SIGNALS);
     private final IncidentRenderer renderer = new IncidentRenderer();
 
     public FocusedIncidentStrategy(String incidentId, int depth) {
@@ -76,6 +82,15 @@ public final class FocusedIncidentStrategy implements IncidentContextStrategy {
                 .limit(maxEvidence)
                 .toList();
 
-        return new IncidentContext(incident, scope, ranked, renderer.render(incident, scope, ranked, graph));
+        // Healthy signals come from the candidate causes: the affected services and what they depend on
+        List<String> candidates = scope.stream()
+                .filter(r -> r.distance() == 0
+                        || (r.distance() == 1 && r.lastEdge().orElseThrow().to().equals(r.id())))
+                .map(Reached::id)
+                .toList();
+        List<HealthySignal> healthy = healthySignals.collect(snapshot.getTelemetry(), window, candidates, evidence);
+
+        return new IncidentContext(incident, scope, ranked, healthy,
+                renderer.render(incident, scope, ranked, healthy, graph));
     }
 }

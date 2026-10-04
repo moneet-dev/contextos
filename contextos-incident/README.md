@@ -56,6 +56,24 @@ Each piece of evidence keeps the file and line of its first telemetry records,
 plus structured attributes (logger, exception, metric, operation, peer) for
 linking to code and database context.
 
+### Healthy signals
+
+Evidence says what changed. Diagnosis also needs what *didn't*, to rule causes
+out. For the affected services and the services they directly depend on (the
+candidate causes), the context also lists:
+- metrics that stayed within their baseline, e.g.
+  `query_p99_ms 7.0 to 10.7 during the window (baseline 8.7)`
+- calls to a dependency at their usual latency with no errors, e.g.
+  `SELECT payment_transactions -> payments-db: median 13 ms (baseline 12 ms), 12 calls, no errors`
+
+Anything flagged as an anomaly is never listed as healthy. Callers of the
+affected service (the blast radius) are left out, since they are effects, not
+causes. The list is capped at 12 signals.
+
+In INC-146 this is what separates the incident from INC-143. The
+pool-exhaustion errors are identical, but the database latency and refund
+traffic stayed normal.
+
 ## Fixture format
 
 ```
@@ -88,6 +106,8 @@ contains unrelated noise (a fraud-api warning and later SMTP failures).
 
 `IncidentContextProvider` adapts `FocusedIncidentStrategy` to `contextos-core`.
 - The first item is an overview: the incident header and the services in scope, with score 1.0.
+- Next comes one healthy-signals item, if there are any, with score 0.75. Ruling causes out
+  matters, but says less than direct evidence.
 - It is followed by one item per ranked piece of evidence:
   - **content:** onset and summary
   - **reason:** relation and timing
