@@ -1,17 +1,18 @@
 package dev.moneet.contextos.code.context;
 
-import dev.moneet.contextos.code.domain.CodeRepository;
-import dev.moneet.contextos.code.domain.Symbol;
-import dev.moneet.contextos.code.source.JavaRepositorySource;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import dev.moneet.contextos.code.domain.CodeRepository;
+import dev.moneet.contextos.code.domain.Symbol;
+import dev.moneet.contextos.code.source.JavaRepositorySource;
 
 class EndpointLookupTest {
 
@@ -64,6 +65,22 @@ class EndpointLookupTest {
         assertTrue(lookup.find("GET /orders/{id}").isEmpty());
         assertEquals("Api#search()", lookup.find("PUT /orders/search").map(Symbol::displayName).orElseThrow());
         assertEquals("Api#list()", lookup.find("GET /orders").map(Symbol::displayName).orElseThrow());
+    }
+
+    @Test
+    void shouldResolveJaxRsClassAndMethodPath(){
+        assertEquals("RefundResource#get(long)", handler("GET /refunds/{id}"));
+    }
+
+
+    @Test
+    void shouldResolveJaxRsClassPathOnly(){
+        assertEquals("RefundResource#create()",handler("POST /refunds"));
+    }
+
+    @Test
+    void shouldResolveJaxRsWithDeleteAndPathParam(){
+        assertEquals("RefundResource#cancel(long)",handler("DELETE /refunds/{id}"));
     }
 
     private static String handler(String operation) {
