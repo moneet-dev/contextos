@@ -20,6 +20,9 @@ Arguments are also validated against each tool's input schema.
 
 ## Run
 
+The jar and the example workspace are attached to every
+[release](https://github.com/moneet-dev/contextos/releases/latest). To build the jar instead:
+
 ```bash
 ./gradlew :contextos-mcp:serverJar
 java -jar contextos-mcp/build/libs/contextos-mcp-all.jar examples

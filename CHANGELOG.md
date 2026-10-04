@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 
 ---
 
+## v0.5.0 – ContextOS preview
+
+The first ContextOS release: it covers the two ContextOS sections below. The release
+assets are the self-contained MCP server jar and the example workspace.
+
+### Added
+
+- `LICENSE` file (MIT), contributing guide and roadmap
+
 ## ContextOS – Repository layout and configuration
 
 ### Changed

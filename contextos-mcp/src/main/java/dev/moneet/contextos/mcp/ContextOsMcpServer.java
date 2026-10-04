@@ -62,7 +62,7 @@ public final class ContextOsMcpServer {
     /** Starts a server on the given streams; the transport reads requests on its own threads. */
     static McpSyncServer start(ContextOsTools tools, InputStream in, OutputStream out) {
         return McpServer.sync(new StdioServerTransportProvider(jsonMapper(), in, out))
-                .serverInfo("contextos", "0.1.0")
+                .serverInfo("contextos", "0.5.0")
                 .instructions(INSTRUCTIONS)
                 .capabilities(ServerCapabilities.builder().tools(false).build())
                 .tools(specifications(tools))
