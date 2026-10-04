@@ -4,6 +4,7 @@ import dev.moneet.contextos.incident.domain.Incident;
 
 import java.io.PrintStream;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,13 +18,22 @@ import java.util.function.Consumer;
  */
 public final class EvalRunner {
 
-    public record Settings(int budgetTokens, int runs, List<Condition> conditions) {
+    /**
+     * @param maxTrials  most trials to run in this call (saved trials don't count);
+     *                   the rest can be run later with the same settings and the saved results
+     */
+    public record Settings(int budgetTokens, int runs, List<Condition> conditions, int maxTrials) {
 
         public Settings {
             conditions = List.copyOf(conditions);
-            if (budgetTokens < 100 || runs < 1 || conditions.isEmpty()) {
-                throw new IllegalArgumentException("budget >= 100, runs >= 1 and at least one condition required");
+            if (budgetTokens < 100 || runs < 1 || conditions.isEmpty() || maxTrials < 1) {
+                throw new IllegalArgumentException(
+                        "budget >= 100, runs >= 1, max trials >= 1 and at least one condition required");
             }
+        }
+
+        public Settings(int budgetTokens, int runs, List<Condition> conditions) {
+            this(budgetTokens, runs, conditions, Integer.MAX_VALUE);
         }
     }
 
@@ -45,8 +55,10 @@ public final class EvalRunner {
 
     /**
      * Runs every trial not already completed in {@code previous}; previous trials that
-     * failed are run again. {@code checkpoint} receives all trials so far, previous ones
-     * included, after each trial, so an interrupted run loses nothing. A fatal error
+     * failed are run again. Trials run one round at a time (run 1 of every case and
+     * condition, then run 2, ...), so a capped or interrupted run covers every case
+     * before repeating any. {@code checkpoint} receives all trials so far, previous ones
+     * included, after each trial, so nothing is lost by stopping early. A fatal error
      * stops the run after a final checkpoint.
      */
     public List<Trial> run(List<EvalCase> cases, Settings settings, List<Trial> previous,
@@ -54,17 +66,16 @@ public final class EvalRunner {
         Map<String, Trial> results = new LinkedHashMap<>();
         previous.forEach(t -> results.put(key(t.incident(), t.condition(), t.run()), t));
         Comparator<Trial> order = order(cases);
+        Map<String, String> builtContexts = new HashMap<>();
 
         int total = cases.size() * settings.conditions().size() * settings.runs();
         int position = 0;
+        int ran = 0;
 
-        for (EvalCase evalCase : cases) {
-            Incident incident = contexts.incident(evalCase.incident());
-            for (Condition condition : settings.conditions()) {
-                String context = null;
-                int contextTokens = 0;
-
-                for (int run = 1; run <= settings.runs(); run++) {
+        for (int run = 1; run <= settings.runs(); run++) {
+            for (EvalCase evalCase : cases) {
+                Incident incident = contexts.incident(evalCase.incident());
+                for (Condition condition : settings.conditions()) {
                     position++;
                     String key = key(incident.id(), condition, run);
                     Trial done = results.get(key);
@@ -73,18 +84,21 @@ public final class EvalRunner {
                                 condition.label(), run, outcome(done));
                         continue;
                     }
-                    if (context == null) {
-                        context = contexts.build(condition, incident.id(), settings.budgetTokens());
-                        contextTokens = contexts.tokens(context);
+                    if (ran == settings.maxTrials()) {
+                        progress.printf("Reached the limit of %d trial(s); the rest can be run later.%n", ran);
+                        return sorted(results, order);
                     }
 
+                    String context = builtContexts.computeIfAbsent(incident.id() + "|" + condition,
+                            k -> contexts.build(condition, incident.id(), settings.budgetTokens()));
                     Trial trial;
                     try {
-                        trial = trial(evalCase, incident, condition, run, context, contextTokens);
+                        trial = trial(evalCase, incident, condition, run, context, contexts.tokens(context));
                     } catch (OpenAiCompatibleClient.ApiException fatal) {
                         checkpoint.accept(sorted(results, order));
                         throw fatal;
                     }
+                    ran++;
                     results.put(key, trial);
                     checkpoint.accept(sorted(results, order));
                     progress.printf("[%d/%d] %s %-20s run %d: %s (%.1fs)%n", position, total, incident.id(),

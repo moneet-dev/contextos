@@ -87,6 +87,30 @@ class ResumeTest {
     }
 
     @Test
+    void shouldCoverEveryCaseOnceBeforeRepeatingAndStopAtTheLimit() {
+        EvalRunner.Settings capped = new EvalRunner.Settings(2000, 2,
+                List.of(Condition.INCIDENT_CONTEXT, Condition.CROSS_DOMAIN), 5);
+        List<String> saved = new ArrayList<>();
+
+        List<Trial> first = runner(answering(), judging()).run(cases, capped, List.of(),
+                trials -> saved.add(trials.size() + ""));
+
+        assertEquals(5, first.size(), "stops at the limit");
+        assertEquals(4, first.stream().filter(t -> t.run() == 1).count(), "every case and condition ran once");
+        assertEquals(List.of("1", "2", "3", "4", "5"), saved, "saved after every trial");
+
+        AtomicInteger calls = new AtomicInteger();
+        ChatModel counting = fake(messages -> {
+            calls.incrementAndGet();
+            return "{\"root_cause\": \"good\", \"fix\": \"good\"}";
+        });
+        List<Trial> rest = runner(counting, judging()).run(cases, SETTINGS, first, trials -> { });
+
+        assertEquals(3, calls.get(), "a later run picks up the remaining trials");
+        assertEquals(8, rest.size());
+    }
+
+    @Test
     void shouldReadBackSavedResults(@TempDir Path dir) {
         List<Trial> trials = runner(answering(), judging()).run(cases, SETTINGS);
         Report.Setup setup = new Report.Setup("gemini", "m", "j", 2000, 2, "20261003-120000");
