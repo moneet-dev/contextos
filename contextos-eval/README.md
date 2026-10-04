@@ -26,6 +26,14 @@ proposed.
 
 The fixtures are generated deterministically by
 [`examples/runtime/generate_fixtures.py`](../examples/runtime/generate_fixtures.py).
+Around every incident, five unrelated services (search, catalog, inventory, users,
+recommendations) keep producing the following, as production systems do:
+- INFO access logs
+- recurring harmless warnings
+- one service's low-rate errors
+- normal metrics and traces
+
+They sit three hops from `payment-service`, outside ContextOS's two-hop scope.
 
 ## Run
 
@@ -116,6 +124,13 @@ Keep in mind:
   smaller than the budget (1–2k tokens), because that is all the ranked evidence
   there is. The other two fill the budget. The report shows average context
   tokens per condition.
-- **Where the raw baseline ends.** It is cut off by time, so with a 4,000-token
-  budget it covers roughly the 15 minutes before the incident. That includes
-  most causes but few symptoms.
+- **Where the raw baseline ends.** The fixtures include realistic background
+  traffic: about 2,200 records per incident window, from 13 services. Cut off at
+  4,000 tokens, the raw baseline covers only the first two or three minutes of the
+  window, before any incident's cause. It shows what scrolling a busy window from
+  the top gets you. It is not a strong baseline: a person would more likely
+  search for errors or start near the incident time.
+- **Rubric changes invalidate earlier results.** Every run records a fingerprint
+  of the rubric and fixtures, and `--resume` refuses to continue a run if they
+  have changed since it started. `examples/eval/cases.json` lists past rubric
+  revisions and why they were made.

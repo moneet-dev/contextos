@@ -40,6 +40,31 @@
       "name": "notification-service",
       "kind": "SERVICE",
       "description": "Customer emails"
+    },
+    {
+      "name": "search-service",
+      "kind": "SERVICE",
+      "description": "Product search"
+    },
+    {
+      "name": "catalog-service",
+      "kind": "SERVICE",
+      "description": "Product catalog"
+    },
+    {
+      "name": "inventory-service",
+      "kind": "SERVICE",
+      "description": "Stock levels"
+    },
+    {
+      "name": "user-service",
+      "kind": "SERVICE",
+      "description": "Accounts and sessions"
+    },
+    {
+      "name": "recommendation-service",
+      "kind": "SERVICE",
+      "description": "Product recommendations"
     }
   ],
   "dependencies": [
@@ -77,6 +102,36 @@
       "from": "notification-service",
       "to": "payment-events",
       "kind": "CONSUMES"
+    },
+    {
+      "from": "api-gateway",
+      "to": "search-service",
+      "kind": "CALLS"
+    },
+    {
+      "from": "api-gateway",
+      "to": "catalog-service",
+      "kind": "CALLS"
+    },
+    {
+      "from": "api-gateway",
+      "to": "user-service",
+      "kind": "CALLS"
+    },
+    {
+      "from": "api-gateway",
+      "to": "recommendation-service",
+      "kind": "CALLS"
+    },
+    {
+      "from": "catalog-service",
+      "to": "inventory-service",
+      "kind": "CALLS"
+    },
+    {
+      "from": "recommendation-service",
+      "to": "catalog-service",
+      "kind": "CALLS"
     }
   ]
 }

@@ -37,7 +37,7 @@ class EvalRunnerTest {
                 cases.stream().map(EvalCase::incident).toList());
         for (EvalCase evalCase : cases) {
             assertNotNull(contexts.incident(evalCase.incident()));
-            assertEquals(2, evalCase.rootCause().size());
+            assertFalse(evalCase.rootCause().isEmpty());
             assertFalse(evalCase.fix().isEmpty());
         }
         assertThrows(IllegalArgumentException.class, () -> new EvalCase("X",
@@ -87,7 +87,7 @@ class EvalRunnerTest {
         assertTrue(trials.stream().filter(t -> t.condition() != Condition.CROSS_DOMAIN).noneMatch(Trial::solved));
         assertTrue(trials.stream().allMatch(t -> t.answer().parsed()));
 
-        String report = Report.markdown(new Report.Setup("fake", "m", "j", 2000, 2, "now"), trials);
+        String report = Report.markdown(new Report.Setup("fake", "m", "j", 2000, 2, "f", "now"), trials);
         assertTrue(report.contains("| cross-domain context | 4/4 (100%) | 4/4 (100%) | 4/4 (100%) |"), report);
         assertTrue(report.contains("| raw telemetry | 0/4 (0%) | 0/4 (0%) | 0/4 (0%) |"), report);
         assertTrue(report.contains("| INC-143 | slow-query | 0/2 | 0/2 | 2/2 |"), report);

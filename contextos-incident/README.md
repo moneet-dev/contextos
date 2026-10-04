@@ -89,7 +89,8 @@ telemetry/changes.jsonl  {timestamp, service, type, description}  type: DEPLOY |
 ```
 
 `examples/runtime` holds INC-143 to INC-146, generated deterministically by
-`examples/runtime/generate_fixtures.py`. INC-143 is the main example. A refund batch drives a slow
+`examples/runtime/generate_fixtures.py`, with unrelated background traffic from five
+more services around each incident. INC-143 is the main example. A refund batch drives a slow
 `payment_transactions` query on the payment database. That query exhausts
 payment-service's connection pool, and charges return 5xx. The fixture also
 contains unrelated noise (a fraud-api warning and later SMTP failures).

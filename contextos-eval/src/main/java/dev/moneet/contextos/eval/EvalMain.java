@@ -65,7 +65,8 @@ public final class EvalMain {
         boolean dryRun = options.containsKey("dry-run");
         boolean resume = options.containsKey("resume");
 
-        List<EvalCase> cases = EvalCase.load(Path.of(options.getOrDefault("cases", "examples/eval/cases.json")));
+        Path casesFile = Path.of(options.getOrDefault("cases", "examples/eval/cases.json"));
+        List<EvalCase> cases = EvalCase.load(casesFile);
         if (options.containsKey("incidents")) {
             List<String> wanted = Arrays.stream(options.get("incidents").split(",")).map(String::trim).toList();
             // In the order given, so a capped run (--max-trials) can put the most useful incidents first
@@ -107,10 +108,12 @@ public final class EvalMain {
         ChatModel subject = new OpenAiCompatibleClient(baseUrl, model, apiKey, temperature, maxTokens);
         Judge judge = new Judge(new OpenAiCompatibleClient(baseUrl, judgeModel, apiKey, 0.0, maxTokens));
 
-        Report.Saved saved = previous(out, resume, provider.name().toLowerCase(), model, judgeModel, budget);
+        String inputs = Inputs.fingerprint(examples, casesFile);
+        Report.Saved saved = previous(out, resume, provider.name().toLowerCase(), model, judgeModel, budget,
+                inputs);
         int runs = integer(options, "runs", saved == null ? 3 : saved.setup().runs());
         Report.Setup setup = new Report.Setup(provider.name().toLowerCase(), model, judgeModel, budget,
-                saved == null ? runs : Math.max(runs, saved.setup().runs()),
+                saved == null ? runs : Math.max(runs, saved.setup().runs()), inputs,
                 saved == null ? stamp : saved.setup().startedAt());
         List<Trial> previous = saved == null ? List.of() : saved.trials();
 
@@ -140,11 +143,11 @@ public final class EvalMain {
 
     /**
      * The saved results to continue, or null for a new run. A new run refuses to
-     * overwrite existing results; a resumed run must use the same provider, models
-     * and budget, so every trial in the report is comparable.
+     * overwrite existing results; a resumed run must use the same provider, models,
+     * budget and inputs (rubric and fixtures), so every trial in the report is comparable.
      */
     static Report.Saved previous(Path out, boolean resume, String provider, String model, String judgeModel,
-                                 int budget) {
+                                 int budget, String inputs) {
         boolean exists = Files.isRegularFile(out.resolve("results.json"));
         if (!resume) {
             if (exists) {
@@ -163,6 +166,10 @@ public final class EvalMain {
             throw new IllegalArgumentException("The results in " + out + " used --provider " + s.provider()
                     + " --model " + s.model() + " --judge-model " + s.judgeModel() + " --budget " + s.budgetTokens()
                     + "; resume with the same options");
+        }
+        if (!inputs.equals(s.inputs())) {
+            throw new IllegalArgumentException("The rubric or fixtures changed since the run in " + out
+                    + " started, so its trials aren't comparable with new ones; start a new --out");
         }
         return saved;
     }
