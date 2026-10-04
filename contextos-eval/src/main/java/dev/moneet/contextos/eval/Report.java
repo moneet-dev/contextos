@@ -20,6 +20,7 @@ public final class Report {
 
     /** How the run was configured, recorded with the results. */
     public record Setup(String provider, String model, String judgeModel, int budgetTokens, int runs,
+                        String inputs,
                         String startedAt) {
     }
 
@@ -66,6 +67,7 @@ public final class Report {
         sb.append("- Judge: `").append(setup.judgeModel()).append("`\n");
         sb.append("- Budget: ").append(setup.budgetTokens()).append(" estimated tokens of context in every condition\n");
         sb.append("- Runs: ").append(setup.runs()).append(" per incident and condition\n");
+        sb.append("- Inputs: `").append(setup.inputs()).append("` (fingerprint of the rubric and fixtures)\n");
         sb.append("- Started: ").append(setup.startedAt()).append("\n\n");
 
         sb.append("## Results\n\n");

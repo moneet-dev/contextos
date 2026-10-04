@@ -1,44 +1,79 @@
 {
   "description": "Rubrics for the ContextOS evaluation. A trial solves an incident when every root-cause criterion is met and at least one fix is proposed.",
+  "revisions": [
+    "2026-10-04: INC-146's separate 'db-healthy' criterion (the database is healthy) was folded into 'pool-config'. It failed every condition identically because correct answers had no reason to state that the database was healthy; the real trap is blaming the database, as in INC-143. Results graded with the earlier rubric are not comparable."
+  ],
   "cases": [
     {
       "incident": "INC-143",
       "rootCause": [
-        {"id": "slow-query", "description": "The refund history query on payment_transactions filtered by payment_id is slow because payment_id has no index (it scans the table)."},
-        {"id": "pool-exhaustion", "description": "A surge of refunds from the refund batch ran that slow query, holding database connections until payment-service's connection pool was exhausted, so charges failed."}
+        {
+          "id": "slow-query",
+          "description": "The refund history query on payment_transactions filtered by payment_id is slow because payment_id has no index (it scans the table)."
+        },
+        {
+          "id": "pool-exhaustion",
+          "description": "A surge of refunds from the refund batch ran that slow query, holding database connections until payment-service's connection pool was exhausted, so charges failed."
+        }
       ],
       "fix": [
-        {"id": "add-index", "description": "Add an index on payment_transactions(payment_id)."}
+        {
+          "id": "add-index",
+          "description": "Add an index on payment_transactions(payment_id)."
+        }
       ]
     },
     {
       "incident": "INC-144",
       "rootCause": [
-        {"id": "bad-deploy", "description": "The payment-service v2.16.0 deploy, made minutes before the incident, introduced the failure."},
-        {"id": "npe-in-charge", "description": "The failure is a NullPointerException in PaymentService.charge (the payment or receipt handling changed by the deploy), not a database, dependency or capacity problem."}
+        {
+          "id": "bad-deploy",
+          "description": "The payment-service v2.16.0 deploy, made minutes before the incident, introduced the failure."
+        },
+        {
+          "id": "npe-in-charge",
+          "description": "The failure is a NullPointerException in PaymentService.charge (the payment or receipt handling changed by the deploy), not a database, dependency or capacity problem."
+        }
       ],
       "fix": [
-        {"id": "rollback", "description": "Roll back or revert the v2.16.0 deploy (or ship a fix for the null handling in PaymentService.charge)."}
+        {
+          "id": "rollback",
+          "description": "Roll back or revert the v2.16.0 deploy (or ship a fix for the null handling in PaymentService.charge)."
+        }
       ]
     },
     {
       "incident": "INC-145",
       "rootCause": [
-        {"id": "fraud-api-slow", "description": "The third-party fraud-api became very slow (latency of many seconds)."},
-        {"id": "fraud-timeouts", "description": "payment-service charges fail because the fraud check call (HttpFraudCheckClient, POST /check to fraud-api) times out, not because of payment-service's own code, its database or a deploy."}
+        {
+          "id": "fraud-api-slow",
+          "description": "The third-party fraud-api became very slow (latency of many seconds)."
+        },
+        {
+          "id": "fraud-timeouts",
+          "description": "payment-service charges fail because the fraud check call (HttpFraudCheckClient, POST /check to fraud-api) times out, not because of payment-service's own code, its database or a deploy."
+        }
       ],
       "fix": [
-        {"id": "timeout-breaker", "description": "Protect the fraud-api call with a shorter timeout, a circuit breaker or a fallback (for example fail open or queue for review), and/or escalate to the fraud-api provider."}
+        {
+          "id": "timeout-breaker",
+          "description": "Protect the fraud-api call with a shorter timeout, a circuit breaker or a fallback (for example fail open or queue for review), and/or escalate to the fraud-api provider."
+        }
       ]
     },
     {
       "incident": "INC-146",
       "rootCause": [
-        {"id": "pool-config", "description": "The configuration change that reduced payment-service's database connection pool (maximum-pool-size from 50 to 5) exhausted the pool, so charges could not get a connection."},
-        {"id": "db-healthy", "description": "The database itself is healthy: queries are not slow, so this is not a slow query, missing index or database overload."}
+        {
+          "id": "pool-config",
+          "description": "The configuration change that reduced payment-service's database connection pool (maximum-pool-size from 50 to 5) exhausted the pool, so charges could not get a connection; the analysis does not instead blame a slow query, a missing index or database overload."
+        }
       ],
       "fix": [
-        {"id": "restore-pool", "description": "Revert the configuration change / restore maximum-pool-size to 50 (or another adequate size)."}
+        {
+          "id": "restore-pool",
+          "description": "Revert the configuration change / restore maximum-pool-size to 50 (or another adequate size)."
+        }
       ]
     }
   ]

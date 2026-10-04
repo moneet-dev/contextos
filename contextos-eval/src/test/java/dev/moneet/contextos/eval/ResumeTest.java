@@ -113,7 +113,7 @@ class ResumeTest {
     @Test
     void shouldReadBackSavedResults(@TempDir Path dir) {
         List<Trial> trials = runner(answering(), judging()).run(cases, SETTINGS);
-        Report.Setup setup = new Report.Setup("gemini", "m", "j", 2000, 2, "20261003-120000");
+        Report.Setup setup = new Report.Setup("gemini", "m", "j", 2000, 2, "f", "20261003-120000");
 
         Report.write(dir, setup, trials);
         Report.Saved saved = Report.read(dir);
@@ -124,21 +124,25 @@ class ResumeTest {
 
     @Test
     void shouldRefuseToOverwriteOrMixRuns(@TempDir Path dir) {
-        assertNull(EvalMain.previous(dir, false, "gemini", "m", "j", 2000), "a new run in an empty directory");
-        assertThrows(IllegalArgumentException.class, () -> EvalMain.previous(dir, true, "gemini", "m", "j", 2000),
+        assertNull(EvalMain.previous(dir, false, "gemini", "m", "j", 2000, "f"), "a new run in an empty directory");
+        assertThrows(IllegalArgumentException.class, () -> EvalMain.previous(dir, true, "gemini", "m", "j", 2000, "f"),
                 "nothing to resume");
 
-        Report.write(dir, new Report.Setup("gemini", "m", "j", 2000, 2, "t"), List.of());
+        Report.write(dir, new Report.Setup("gemini", "m", "j", 2000, 2, "f", "t"), List.of());
 
         IllegalArgumentException overwrite = assertThrows(IllegalArgumentException.class,
-                () -> EvalMain.previous(dir, false, "gemini", "m", "j", 2000));
+                () -> EvalMain.previous(dir, false, "gemini", "m", "j", 2000, "f"));
         assertTrue(overwrite.getMessage().contains("pass --resume"));
 
         IllegalArgumentException mixed = assertThrows(IllegalArgumentException.class,
-                () -> EvalMain.previous(dir, true, "gemini", "other-model", "j", 2000));
+                () -> EvalMain.previous(dir, true, "gemini", "other-model", "j", 2000, "f"));
         assertTrue(mixed.getMessage().contains("--model m"), mixed.getMessage());
 
-        assertNotNull(EvalMain.previous(dir, true, "gemini", "m", "j", 2000));
+        assertNotNull(EvalMain.previous(dir, true, "gemini", "m", "j", 2000, "f"));
+
+        IllegalArgumentException changed = assertThrows(IllegalArgumentException.class,
+                () -> EvalMain.previous(dir, true, "gemini", "m", "j", 2000, "other-fixtures"));
+        assertTrue(changed.getMessage().contains("rubric or fixtures changed"), changed.getMessage());
     }
 
     private static Trial failed(Trial trial) {

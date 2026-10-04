@@ -31,7 +31,7 @@ class FileRuntimeSourceTest {
         RuntimeSnapshot snapshot =
                 new FileRuntimeSource(Path.of(System.getProperty("contextos.examples"), "runtime")).load();
 
-        assertEquals(8, snapshot.getTopology().getServices().size());
+        assertEquals(13, snapshot.getTopology().getServices().size());
         assertEquals("payment-service", snapshot.getTopology().getService("payment-service").repository());
         assertEquals(ServiceKind.DATABASE, snapshot.getTopology().getService("payments-db").kind());
 
@@ -40,9 +40,9 @@ class FileRuntimeSourceTest {
         assertEquals(Instant.parse("2026-09-30T14:02:00Z"), incident.startedAt());
         assertEquals(java.util.List.of("payment-service"), incident.affectedServices());
 
-        assertEquals(383, snapshot.getTelemetry().getLogs().size());
-        assertEquals(2912, snapshot.getTelemetry().getMetrics().size());
-        assertEquals(1013, snapshot.getTelemetry().getSpans().size());
+        assertEquals(4937, snapshot.getTelemetry().getLogs().size());
+        assertEquals(8736, snapshot.getTelemetry().getMetrics().size());
+        assertEquals(3919, snapshot.getTelemetry().getSpans().size());
         assertEquals(7, snapshot.getTelemetry().getChanges().size());
         assertEquals(4, snapshot.getIncidents().size());
     }

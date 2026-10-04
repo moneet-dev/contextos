@@ -19,6 +19,16 @@ All notable changes to this project are documented here.
   passwords only from environment variables) or from DDL scripts
 - `--max-trials` for the evaluation, which now runs one round of every incident and
   condition at a time
+- Fixture background noise: five unrelated services with access logs, harmless
+  warnings, low-rate errors, metrics and traces around every incident
+- Evaluation runs record a fingerprint of the rubric and fixtures; `--resume` refuses
+  to mix results from different inputs
+
+### Fixed
+
+- INC-146 rubric: the separate "database is healthy" criterion was folded into the
+  root-cause criterion; it rewarded mentioning database health rather than avoiding
+  the INC-143 misdiagnosis
 
 ---
 

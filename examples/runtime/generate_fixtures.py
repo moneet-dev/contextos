@@ -1,4 +1,5 @@
-"""Generates the deterministic runtime fixture in examples/runtime (INC-143..INC-146).
+"""Generates the deterministic runtime fixture in examples/runtime (INC-143..INC-146),
+with unrelated background traffic around each incident.
 
 Usage: python generate_fixtures.py [output-dir]   (default: this script's directory)
 """
@@ -36,6 +37,11 @@ services = {
         {"name": "payments-db", "kind": "DATABASE", "description": "PostgreSQL, payments schema"},
         {"name": "payment-events", "kind": "QUEUE", "description": "Kafka topic payment-events"},
         {"name": "notification-service", "kind": "SERVICE", "description": "Customer emails"},
+        {"name": "search-service", "kind": "SERVICE", "description": "Product search"},
+        {"name": "catalog-service", "kind": "SERVICE", "description": "Product catalog"},
+        {"name": "inventory-service", "kind": "SERVICE", "description": "Stock levels"},
+        {"name": "user-service", "kind": "SERVICE", "description": "Accounts and sessions"},
+        {"name": "recommendation-service", "kind": "SERVICE", "description": "Product recommendations"},
     ],
     "dependencies": [
         {"from": "api-gateway", "to": "checkout-service", "kind": "CALLS"},
@@ -45,6 +51,12 @@ services = {
         {"from": "payment-service", "to": "payments-db", "kind": "QUERIES"},
         {"from": "payment-service", "to": "payment-events", "kind": "PUBLISHES"},
         {"from": "notification-service", "to": "payment-events", "kind": "CONSUMES"},
+        {"from": "api-gateway", "to": "search-service", "kind": "CALLS"},
+        {"from": "api-gateway", "to": "catalog-service", "kind": "CALLS"},
+        {"from": "api-gateway", "to": "user-service", "kind": "CALLS"},
+        {"from": "api-gateway", "to": "recommendation-service", "kind": "CALLS"},
+        {"from": "catalog-service", "to": "inventory-service", "kind": "CALLS"},
+        {"from": "recommendation-service", "to": "catalog-service", "kind": "CALLS"},
     ],
 }
 (out / "services.json").write_text(json.dumps(services, indent=2) + "\n")
@@ -397,6 +409,91 @@ for i in range(40):
     span(tr, root, "payment-service", "POST /check", t, rng.randint(95, 135), peer="fraud-api")
     if not failed:
         span(tr, root, "payment-service", "INSERT payments", t, rng.randint(4, 9), peer="payments-db")
+
+# ================================================================ background noise
+# Production telemetry is mostly unrelated to any incident. Around every incident
+# (the same 90 minutes its metrics cover) other services keep working: steady INFO
+# access logs, recurring harmless warnings, an unrelated service with low-rate
+# errors, normal metrics and traces. The noise services hang off api-gateway, three
+# hops from payment-service, so topology-aware context leaves them out while a raw
+# slice of the window has to wade through them. Each incident's noise has its own seed.
+
+NOISE_SERVICES = ["search-service", "catalog-service", "inventory-service", "user-service",
+                  "recommendation-service"]
+
+
+def access_log(rng, t):
+    service = rng.choice(["api-gateway", "api-gateway", "search-service", "catalog-service", "user-service",
+                          "recommendation-service", "inventory-service", "checkout-service", "payment-service"])
+    n = rng.randint(1000, 99999)
+    messages = {
+        "api-gateway": ("gateway.AccessLog", f"GET /api/products/{n} 200 {rng.randint(8, 60)}ms"),
+        "search-service": ("search.QueryLog", f"Search q='item {n % 500}' hits={rng.randint(0, 80)} took={rng.randint(9, 70)}ms"),
+        "catalog-service": ("catalog.ProductCache", f"Cache hit for product {n}"),
+        "user-service": ("users.SessionService", f"Session refreshed for user {n}"),
+        "recommendation-service": ("recs.Recommender", f"Served {rng.randint(4, 20)} recommendations for user {n}"),
+        "inventory-service": ("inventory.StockService", f"Stock check sku-{n}: {rng.randint(0, 40)} available"),
+        "checkout-service": ("checkout.CheckoutController", f"Checkout started for cart {n}"),
+        "payment-service": ("com.example.payments.api.PaymentController", f"POST /payments 200 {rng.randint(150, 240)}ms"),
+    }
+    logger, message = messages[service]
+    return (t, service, "INFO", logger, message, None, None)
+
+
+def add_noise(seed, start, prefix):
+    rng = random.Random(seed)
+    first = start - timedelta(minutes=62)
+    last = start + timedelta(minutes=28)
+
+    # Steady INFO traffic, about 12 lines a minute
+    t = first
+    while t < last:
+        logs.append(access_log(rng, t))
+        t += timedelta(seconds=rng.randint(2, 8))
+
+    # Recurring harmless warnings and an unrelated service's low-rate errors
+    recurring = [
+        (240, "search-service", "WARN", "search.QueryLog", lambda: f"Slow query on search-index: {rng.randint(1200, 1900)} ms", None),
+        (420, "user-service", "WARN", "users.TokenClient", lambda: "Token refresh retry (attempt 1)", None),
+        (600, "payment-service", "WARN", "org.hibernate.orm.deprecation",
+         lambda: "HHH90000025: spring.jpa.open-in-view is enabled by default", None),
+        (360, "recommendation-service", "ERROR", "recs.FeatureStoreClient",
+         lambda: "Feature store timeout, serving fallback recommendations",
+         "java.util.concurrent.TimeoutException: feature-store did not respond within 800ms"),
+    ]
+    for every, service, level, logger, message, exception in recurring:
+        t = first + timedelta(seconds=rng.randint(0, every))
+        while t < last:
+            logs.append((t, service, level, logger, message(), exception, None))
+            t += timedelta(seconds=every + rng.randint(-30, 30))
+
+    # Normal metrics for the noise services, and the payment-service JVM
+    series_by_key = {}
+    for service in NOISE_SERVICES:
+        series_by_key[(service, "http_requests_per_min")] = noisy(rng, 300, 30)
+        series_by_key[(service, "http_p99_latency_ms")] = noisy(rng, 120, 15)
+        series_by_key[(service, "error_rate_percent")] = noisy(rng, 0.3, 0.1)
+    series_by_key[("payment-service", "jvm_heap_used_mb")] = noisy(rng, 512, 40)
+    for minute in range(0, 91):
+        t = first + timedelta(minutes=minute)
+        for (service, metric), fn in series_by_key.items():
+            metric_rows.append(f"{iso(t)},{service},{metric},{fn(t):.1f}")
+
+    # Normal search traffic through the gateway
+    t = first
+    i = 0
+    while t < last:
+        tr = f"{prefix}-n{i:05d}"
+        root = span(tr, None, "api-gateway", "GET /api/search", t, rng.randint(40, 90), peer="search-service")
+        span(tr, root, "search-service", "GET /search", t, rng.randint(25, 70))
+        t += timedelta(seconds=rng.randint(10, 20))
+        i += 1
+
+
+add_noise(9143, START, "n143")
+add_noise(9144, datetime(2026, 10, 7, 10, 20, tzinfo=timezone.utc), "n144")
+add_noise(9145, datetime(2026, 10, 14, 16, 40, tzinfo=timezone.utc), "n145")
+add_noise(9146, datetime(2026, 10, 21, 9, 5, tzinfo=timezone.utc), "n146")
 
 # ================================================================ write files
 (out / "incidents.json").write_text(json.dumps(incidents, indent=2) + "\n")
