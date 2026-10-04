@@ -1,15 +1,15 @@
 package dev.moneet.contextos.code.context;
 
-import dev.moneet.contextos.code.domain.CodeRepository;
-import dev.moneet.contextos.code.domain.Symbol;
-import dev.moneet.contextos.code.domain.SymbolKind;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import dev.moneet.contextos.code.domain.CodeRepository;
+import dev.moneet.contextos.code.domain.Symbol;
+import dev.moneet.contextos.code.domain.SymbolKind;
 
 /**
  * Finds the handler method for an HTTP route, from Spring MVC mapping annotations
@@ -18,6 +18,13 @@ import java.util.regex.Pattern;
  * {@code POST /payments/{id}/refund} finds {@code @PostMapping("/{paymentId}/refund")}
  * under {@code @RequestMapping("/payments")}.
  */
+
+// SamBuilds
+// Added Regex to handle jax-rs requests
+
+/* path - "@Path\\(\"([^\]*)\"\\)"
+ * verb - "@(GET|POST|PUT|DELETE|PATCH)\\b" 
+*/
 public final class EndpointLookup {
 
     private static final Pattern MAPPING =
@@ -25,6 +32,9 @@ public final class EndpointLookup {
     private static final Pattern FIRST_STRING = Pattern.compile("\"([^\"]*)\"");
     private static final Pattern PATH_VARIABLE = Pattern.compile("\\{[^}]*}");
     private static final Pattern HTTP_METHOD = Pattern.compile("RequestMethod\\.(\\w+)");
+
+    private static final Pattern JAX_RS_PATH = Pattern.compile("@Path\\(\"([^\"]*)\"\\)");
+    private static final Pattern JAX_RS_VERB = Pattern.compile("@(GET|PUT|POST|DELETE|PATCH)\\b");
 
     private record Endpoint(String method, String path, Symbol handler) {
     }
@@ -73,7 +83,14 @@ public final class EndpointLookup {
     private static Optional<Mapping> mapping(String signature) {
         Matcher matcher = MAPPING.matcher(signature);
         if (!matcher.find()) {
-            return Optional.empty();
+            Matcher pathMatcher = JAX_RS_PATH.matcher(signature);
+            Matcher verbMatcher = JAX_RS_VERB.matcher(signature);
+            boolean haspath = pathMatcher.find();
+            boolean hasverb = verbMatcher.find();
+            if (!haspath && !hasverb) return Optional.empty();
+            String path = haspath ? pathMatcher.group(1) : "";
+            String verb = hasverb ? verbMatcher.group(1) : "";
+            return Optional.of(new Mapping(verb,path));
         }
         String arguments = matcher.group(3) == null ? "" : matcher.group(3);
 
