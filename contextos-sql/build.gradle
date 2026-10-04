@@ -12,11 +12,11 @@ repositories {
     mavenCentral()
 }
 
-// Adapter only: depends on the SQL Schema Context library (the root project),
+// Adapter only: depends on the SQL Schema Context library (the schema-context module),
 // which itself has no dependency on ContextOS.
 dependencies {
     api project(':contextos-core')
-    api project(':')
+    api project(':schema-context')
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
 }
 
