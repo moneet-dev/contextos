@@ -23,7 +23,7 @@ public final class ContextBuilder {
         this.contextOS = workspace.contextOS();
         this.incidents = new IncidentContextProvider(workspace.runtime(),
                 new ServiceGraphBuilder().build(workspace.runtime().getTopology()));
-        this.raw = new RawTelemetryContext(workspace.root().resolve("runtime"), estimator);
+        this.raw = new RawTelemetryContext(workspace.runtimeDir(), estimator);
     }
 
     public Incident incident(String id) {

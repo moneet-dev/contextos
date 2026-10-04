@@ -1,0 +1,11 @@
+{
+  "runtime": "runtime",
+  "repositories": {
+    "payment-service": "payment-service"
+  },
+  "databases": {
+    "payments-db": {
+      "ddl": "runtime/databases/payments-db.sql"
+    }
+  }
+}

@@ -12,78 +12,134 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.util.Objects;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.function.Function;
 
 /**
- * Everything the tools read, loaded once at startup from a directory laid out
- * like {@code examples/}:
- * <pre>
- * runtime/                       topology, incidents, telemetry (FileRuntimeSource)
- * runtime/databases/&lt;name&gt;.sql   one DDL script per DATABASE service
- * &lt;repository&gt;/                  source code, named as in a service's "repository"
- * </pre>
- * Each DDL script is loaded into in-memory SQLite and read back through SQL
- * Schema Context. Used by the MCP server and the evaluation.
+ * Everything the tools read, loaded once at startup from a {@link ContextOsConfig}:
+ * an optional runtime snapshot (topology, incidents, telemetry), code
+ * repositories and database schemas, each by the name the topology uses.
+ *
+ * <p>Databases are read through SQL Schema Context, either over JDBC or from a
+ * DDL script loaded into in-memory SQLite. JDBC connections are opened read-only
+ * and only metadata is read. Used by the MCP server and the evaluation.
  */
 public record Workspace(Path root,
+                        Path runtimeDir,
                         RuntimeSnapshot runtime,
-                        String repositoryName,
-                        CodeRepository repository,
-                        String databaseName,
-                        DatabaseSchema schema) {
+                        Map<String, CodeRepository> repositories,
+                        Map<String, DatabaseSchema> databases) {
 
     public Workspace {
-        Objects.requireNonNull(runtime, "runtime must not be null");
+        repositories = Collections.unmodifiableMap(new LinkedHashMap<>(repositories));
+        databases = Collections.unmodifiableMap(new LinkedHashMap<>(databases));
     }
 
-    /** Loads the single repository and database the topology refers to. */
-    public static Workspace load(Path root) {
-        Path runtimeDir = root.resolve("runtime");
-        if (!Files.isRegularFile(runtimeDir.resolve("services.json"))) {
-            throw new IllegalArgumentException("No runtime/services.json under " + root.toAbsolutePath());
+    /**
+     * Loads from a {@code contextos.json} file, or from a directory containing one,
+     * reading passwords from the process environment.
+     */
+    public static Workspace load(Path path) {
+        return load(path, System::getenv);
+    }
+
+    public static Workspace load(Path path, Function<String, String> environment) {
+        Path file = Files.isDirectory(path) ? path.resolve(ContextOsConfig.FILE_NAME) : path;
+        if (!Files.isRegularFile(file)) {
+            throw new IllegalArgumentException("No " + ContextOsConfig.FILE_NAME + " at " + file.toAbsolutePath()
+                    + "; see the contextos module README for the format");
         }
-        RuntimeSnapshot runtime = new FileRuntimeSource(runtimeDir).load();
+        ContextOsConfig config = ContextOsConfig.read(file);
 
-        String repositoryName = runtime.getTopology().getServices().stream()
-                .map(s -> s.repository())
-                .filter(Objects::nonNull)
-                .filter(name -> Files.isDirectory(root.resolve(name)))
-                .findFirst()
-                .orElse(null);
-        CodeRepository repository = repositoryName == null
-                ? null
-                : new JavaRepositorySource(root.resolve(repositoryName)).load();
+        RuntimeSnapshot runtime = null;
+        if (config.runtime() != null) {
+            if (!Files.isRegularFile(config.runtime().resolve("services.json"))) {
+                throw new IllegalArgumentException("No services.json in runtime directory " + config.runtime());
+            }
+            runtime = new FileRuntimeSource(config.runtime()).load();
+        }
 
-        String databaseName = runtime.getTopology().getServices().stream()
-                .filter(s -> s.kind().name().equals("DATABASE"))
-                .map(s -> s.name())
-                .filter(name -> Files.isRegularFile(runtimeDir.resolve("databases/" + name + ".sql")))
-                .findFirst()
-                .orElse(null);
-        DatabaseSchema schema = databaseName == null
-                ? null
-                : loadSchema(runtimeDir.resolve("databases/" + databaseName + ".sql"));
+        Map<String, CodeRepository> repositories = new LinkedHashMap<>();
+        config.repositories().forEach((name, dir) -> {
+            if (!Files.isDirectory(dir)) {
+                throw new IllegalArgumentException("Repository '" + name + "' not found at " + dir);
+            }
+            repositories.put(name, new JavaRepositorySource(dir).load());
+        });
 
-        return new Workspace(root, runtime, repositoryName, repository, databaseName, schema);
+        Map<String, DatabaseSchema> databases = new LinkedHashMap<>();
+        config.databases().forEach((name, db) -> databases.put(name, loadSchema(name, db, environment)));
+
+        return new Workspace(file.toAbsolutePath().getParent(), config.runtime(), runtime, repositories, databases);
     }
 
+    public boolean hasRuntime() {
+        return runtime != null;
+    }
+
+    /** Cross-domain investigation over everything configured; needs a runtime. */
     public ContextOS contextOS() {
+        if (runtime == null) {
+            throw new IllegalStateException("No runtime is configured, so there are no incidents to investigate");
+        }
         ContextOS.Builder builder = ContextOS.builder().runtime(runtime);
-        if (repository != null) {
-            builder.repository(repositoryName, repository);
-        }
-        if (schema != null) {
-            builder.database(databaseName, schema);
-        }
+        repositories.forEach(builder::repository);
+        databases.forEach(builder::database);
         return builder.build();
     }
 
-    private static DatabaseSchema loadSchema(Path script) {
-        try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
-            SqlScript.run(connection, script);
-            return new JdbcSchemaMetadataSource(connection, null).load();
-        } catch (SQLException e) {
-            throw new IllegalStateException("Failed to load " + script, e);
+    private static DatabaseSchema loadSchema(String name, ContextOsConfig.DatabaseConfig db,
+                                             Function<String, String> environment) {
+        if (!db.isJdbc()) {
+            if (!Files.isRegularFile(db.ddl())) {
+                throw new IllegalArgumentException("Database '" + name + "': DDL script not found at " + db.ddl());
+            }
+            try (Connection connection = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+                SqlScript.run(connection, db.ddl());
+                return new JdbcSchemaMetadataSource(connection, null).load();
+            } catch (SQLException e) {
+                throw new IllegalStateException("Database '" + name + "': failed to load " + db.ddl(), e);
+            }
         }
+
+        String password = null;
+        if (db.passwordEnv() != null) {
+            password = environment.apply(db.passwordEnv());
+            if (password == null) {
+                throw new IllegalArgumentException("Database '" + name + "': set the " + db.passwordEnv()
+                        + " environment variable to its password");
+            }
+        }
+        try (Connection connection = DriverManager.getConnection(db.jdbcUrl(), db.user(), password)) {
+            readOnly(connection);
+            return new JdbcSchemaMetadataSource(connection, db.schema()).load();
+        } catch (SQLException e) {
+            String reason = e.getMessage() != null && e.getMessage().startsWith("No suitable driver")
+                    ? "no JDBC driver for this URL on the classpath (PostgreSQL and SQLite are included; "
+                    + "add other drivers' jars)"
+                    : e.getMessage();
+            throw new IllegalArgumentException("Database '" + name + "' (" + redact(db.jdbcUrl()) + "): " + reason, e);
+        }
+    }
+
+    /**
+     * A safety hint only: just metadata is read. Some drivers (e.g. SQLite) can't
+     * switch an open connection to read-only; a read-only database user is the real
+     * guarantee.
+     */
+    private static void readOnly(Connection connection) {
+        try {
+            connection.setReadOnly(true);
+        } catch (SQLException e) {
+            // not supported by this driver
+        }
+    }
+
+    /** The URL without any credentials or parameters, which may carry secrets. */
+    static String redact(String jdbcUrl) {
+        String withoutParameters = jdbcUrl.replaceAll("[?;].*$", "");
+        return withoutParameters.replaceAll("//[^/@]*@", "//");
     }
 }

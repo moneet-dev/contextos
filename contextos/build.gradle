@@ -18,6 +18,10 @@ dependencies {
     api project(':contextos-sql')
     api project(':contextos-code')
     api project(':contextos-incident')
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.2'
+    // JDBC drivers for configured databases; SQLite comes with SQL Schema Context.
+    // Other databases (e.g. MySQL, whose driver is GPL) need their driver jar on the classpath.
+    runtimeOnly 'org.postgresql:postgresql:42.7.13'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
 }
 

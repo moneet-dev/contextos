@@ -4,6 +4,24 @@ All notable changes to this project are documented here.
 
 ---
 
+## ContextOS – Repository layout and configuration
+
+### Changed
+
+- The repository is now ContextOS: the Gradle root project is `contextos`, and the SQL
+  Schema Context engine moved from the root into the `schema-context` module (packages
+  and APIs unchanged; its docs are in `schema-context/README.md`)
+
+### Added
+
+- `contextos.json` workspace configuration: an optional runtime, any number of code
+  repositories, and databases over JDBC (PostgreSQL and SQLite drivers included;
+  passwords only from environment variables) or from DDL scripts
+- `--max-trials` for the evaluation, which now runs one round of every incident and
+  condition at a time
+
+---
+
 ## ContextOS – Code, Incident and Cross-Domain Context
 
 ContextOS modules added around the Schema Context Engine, which is unchanged

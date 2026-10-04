@@ -1,6 +1,6 @@
 # ContextOS — SQL adapter
 
-Exposes SQL Schema Context (the root project) as a ContextOS provider. The SQL
+Exposes SQL Schema Context (the [`schema-context`](../schema-context/README.md) module) as a ContextOS provider. The SQL
 library is used as it is and does not depend on ContextOS.
 
 ```java

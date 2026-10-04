@@ -55,7 +55,8 @@ Options:
 | `--judge-model` | same as `--model` | Model that grades answers |
 | `--runs` | 3 | Repetitions per incident and condition |
 | `--budget` | 4000 | Estimated context tokens per condition |
-| `--incidents` | all | e.g. `INC-143,INC-146` |
+| `--incidents` | all | e.g. `INC-145,INC-146`, run in that order |
+| `--max-trials` | no limit | Stop after this many trials, e.g. to fit a daily quota; continue with `--resume` |
 | `--conditions` | all | e.g. `raw_telemetry,cross_domain` |
 | `--temperature` | 0.2 | For answers; the judge always uses 0 |
 | `--max-tokens` | 4096 | Output limit per call. Reasoning models spend part of it thinking; a cut-off answer is recorded as an error, not graded |
@@ -76,7 +77,10 @@ key, an unknown model or a quota of zero stops the run immediately.
 Free tiers often cap requests per model per day. Gemini's free tier, for
 example, allowed 20 a day per model, while a full run needs 36 answer calls and
 36 judge calls. So the harness:
-- saves `results.json` and `report.md` after every trial
+- saves `results.json` and `report.md` after every trial, so the report can be read
+  while the run is still going
+- runs one round at a time (run 1 of every incident and condition, then run 2,
+  ...), so a stopped or capped run has covered every incident before repeating any
 - stops the run when a rate limit outlasts every retry (likely a daily quota),
   instead of failing trial after trial
 - stops at once on a model whose quota is 0

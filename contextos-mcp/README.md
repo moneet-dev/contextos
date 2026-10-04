@@ -6,10 +6,10 @@ Exposes ContextOS to MCP clients such as Claude Code, over stdio.
 
 | Tool | Arguments | Returns |
 |---|---|---|
-| `list_incidents` | none | Incidents with severity, start time and affected services; the loaded repository and database |
+| `list_incidents` | none | Incidents with severity, start time and affected services; the configured repositories and databases |
 | `investigate_incident` | `incident_id`, `budget`? | Cross-domain context: context map, ranked incident evidence, linked code and tables |
-| `code_context` | `query`, `depth`? (2), `budget`? | Ranked code around a symbol (`Type`, `Type#method`, file path, ...) |
-| `schema_context` | `table`, `depth`? (1), `budget`? | A table with related tables, join conditions and join quality; empty `table` returns the whole schema |
+| `code_context` | `query`, `repository`?, `depth`? (2), `budget`? | Ranked code around a symbol (`Type`, `Type#method`, file path, ...) |
+| `schema_context` | `table`, `database`?, `depth`? (1), `budget`? | A table with related tables, join conditions and join quality; empty `table` returns the whole schema |
 
 Budgets default to 4,000 estimated tokens. Each result ends with the tokens
 used and what was omitted for budget.
@@ -25,15 +25,18 @@ Arguments are also validated against each tool's input schema.
 java -jar contextos-mcp/build/libs/contextos-mcp-all.jar examples
 ```
 
-The argument is a directory laid out like [`examples/`](../examples):
-- `runtime/`: topology, incidents and telemetry
-- `runtime/databases/<service>.sql`: DDL for each `DATABASE` service
-- the source repository a service names in its `repository` field
+The argument is a `contextos.json` file, or a directory containing one. It
+lists the code repositories, the databases (over JDBC, or from a DDL script) and,
+optionally, the runtime folder with incidents and telemetry. See
+[Configuration](../contextos/README.md#configuration). Without a runtime,
+`code_context` and `schema_context` still work.
+
+`repository` and `database` are needed only when more than one is configured.
 
 ### Register with Claude Code
 
 ```bash
-claude mcp add contextos -- java -jar /absolute/path/to/contextos-mcp/build/libs/contextos-mcp-all.jar /absolute/path/to/examples
+claude mcp add contextos -- java -jar /absolute/path/to/contextos-mcp/build/libs/contextos-mcp-all.jar /absolute/path/to/contextos.json
 ```
 
 Then ask, for example: *"What caused INC-143? Use the contextos tools."*

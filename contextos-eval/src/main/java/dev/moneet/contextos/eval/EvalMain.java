@@ -27,7 +27,8 @@ import java.util.Map;
  * --api-key-env  environment variable holding the key (default: the provider's)
  * --runs         repetitions per incident and condition (default 3)
  * --budget       context tokens per condition (default 4000)
- * --incidents    comma-separated ids (default: all cases)
+ * --incidents    comma-separated ids, run in that order (default: all cases)
+ * --max-trials   stop after this many trials; continue later with --resume (default: no limit)
  * --conditions   comma-separated: raw_telemetry, incident_context, cross_domain (default: all)
  * --temperature  sampling temperature for answers (default 0.2; the judge uses 0)
  * --max-tokens   output token limit per call, including any reasoning (default 4096)
@@ -67,10 +68,13 @@ public final class EvalMain {
         List<EvalCase> cases = EvalCase.load(Path.of(options.getOrDefault("cases", "examples/eval/cases.json")));
         if (options.containsKey("incidents")) {
             List<String> wanted = Arrays.stream(options.get("incidents").split(",")).map(String::trim).toList();
-            cases = cases.stream().filter(c -> wanted.contains(c.incident())).toList();
-            if (cases.isEmpty()) {
-                throw new IllegalArgumentException("No cases for incidents " + wanted);
-            }
+            // In the order given, so a capped run (--max-trials) can put the most useful incidents first
+            List<EvalCase> all = cases;
+            cases = wanted.stream()
+                    .map(id -> all.stream().filter(c -> c.incident().equals(id)).findFirst()
+                            .orElseThrow(() -> new IllegalArgumentException("No case for incident " + id
+                                    + "; cases: " + all.stream().map(EvalCase::incident).toList())))
+                    .toList();
         }
         List<Condition> conditions = options.containsKey("conditions")
                 ? Arrays.stream(options.get("conditions").split(",")).map(Condition::parse).toList()
@@ -98,6 +102,7 @@ public final class EvalMain {
         }
         double temperature = Double.parseDouble(options.getOrDefault("temperature", "0.2"));
         int maxTokens = integer(options, "max-tokens", 4096);
+        int maxTrials = integer(options, "max-trials", Integer.MAX_VALUE);
 
         ChatModel subject = new OpenAiCompatibleClient(baseUrl, model, apiKey, temperature, maxTokens);
         Judge judge = new Judge(new OpenAiCompatibleClient(baseUrl, judgeModel, apiKey, 0.0, maxTokens));
@@ -115,7 +120,7 @@ public final class EvalMain {
                         : "");
         try {
             new EvalRunner(contexts, subject, judge, System.out).run(cases,
-                    new EvalRunner.Settings(budget, runs, conditions), previous,
+                    new EvalRunner.Settings(budget, runs, conditions, maxTrials), previous,
                     trials -> Report.write(out, setup, trials));
         } catch (OpenAiCompatibleClient.ApiException e) {
             System.err.println("\nStopped: " + e.getMessage());
@@ -126,6 +131,9 @@ public final class EvalMain {
             throw e;
         }
 
+        if (maxTrials != Integer.MAX_VALUE) {
+            System.out.println("To run more, repeat with --resume --out " + out);
+        }
         System.out.println("\nReport: " + out.resolve("report.md").toAbsolutePath());
         System.out.println("Trials: " + out.resolve("results.json").toAbsolutePath());
     }

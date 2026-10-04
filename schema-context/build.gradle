@@ -1,0 +1,46 @@
+// SQL Schema Context: the database schema engine ContextOS builds on.
+
+plugins {
+    // Apply the application plugin to add support for building a CLI application in Java.
+    id 'java'
+    id 'application'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+repositories {
+    // Use Maven Central for resolving dependencies.
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.xerial:sqlite-jdbc:3.45.1.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+    testImplementation 'org.testcontainers:postgresql:1.19.3'
+    testImplementation 'org.testcontainers:mysql:1.19.3'
+    testImplementation 'org.testcontainers:junit-jupiter:1.19.3'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+tasks.named('test') {
+    // Use JUnit Platform for unit tests.
+    useJUnitPlatform()
+}
+
+application {
+    mainClass = 'dev.moneet.schema.EcommerceDemo'
+}
+
+tasks.register('complianceDemo', JavaExec) {
+    group = 'application'
+    description = 'Runs the financial compliance schema demo.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'dev.moneet.schema.FinancialComplianceDemo'
+}

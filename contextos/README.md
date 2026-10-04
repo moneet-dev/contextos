@@ -28,6 +28,54 @@ context.links();      // every link followed, with its source item and weight
 Repositories and databases are registered under the names the topology uses:
 a service's `repository` field, and a `DATABASE` service's name.
 
+## Configuration
+
+A workspace is described by a `contextos.json` file. Paths are relative to the
+file, and names match the topology: a service's `repository` field, and a
+`DATABASE` service's name.
+
+```json
+{
+  "runtime": "runtime",
+  "repositories": {
+    "payment-service": "../payment-service"
+  },
+  "databases": {
+    "payments-db": {
+      "jdbcUrl": "jdbc:postgresql://localhost:5432/payments",
+      "user": "contextos_ro",
+      "passwordEnv": "PAYMENTS_DB_PASSWORD",
+      "schema": "public"
+    },
+    "reporting": { "ddl": "databases/reporting.sql" }
+  }
+}
+```
+
+| Key | Meaning |
+|---|---|
+| `runtime` | Optional. Folder with `services.json`, `incidents.json` and `telemetry/`. Without it there are no incidents, but code and schema context still work. |
+| `repositories` | Name to source folder. |
+| `databases` | Name to either a JDBC connection (`jdbcUrl`, plus optional `user`, `passwordEnv` and `schema`) or a DDL script (`ddl`) loaded into in-memory SQLite. |
+
+- **Passwords are never written in the file.** `passwordEnv` names the
+  environment variable that holds one.
+- **Use a read-only database user.** Only schema metadata is read: tables,
+  columns, keys and indexes, never rows.
+- **Drivers:** PostgreSQL and SQLite drivers are included. For another
+  database, add its driver jar to the classpath (MySQL's driver is GPL-licensed,
+  so it isn't bundled).
+- **Typos are caught.** Unknown keys are rejected, so a misspelled setting fails
+  loudly instead of being ignored.
+
+[`examples/contextos.json`](../examples/contextos.json) configures the INC-143
+example.
+
+```java
+Workspace workspace = Workspace.load(Path.of("contextos.json"));
+CrossDomainContext context = workspace.contextOS().investigate("INC-143", ContextBudget.tokens(4000));
+```
+
 ## How links are found
 
 Every link comes from data the providers already capture:
